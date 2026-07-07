@@ -299,20 +299,26 @@ export default function GroupPage() {
                   let lentClass = 'text-gray-500';
                   
                   if (!isPayment && expense.split_with.length > 0) {
-                    const firstSplit = expense.split_with[0];
-                    const splitIsMe = isMe(firstSplit.name, firstSplit.id);
+                    // Find the split member who isn't the creator (the actual borrower)
+                    const creatorId = expense.created_by;
+                    const otherMember = expense.split_with.find(m => {
+                      if (creatorIsMe) return !isMe(m.name, m.id);
+                      return isMe(m.name, m.id);
+                    }) || expense.split_with.find(m => m.id !== creatorId) || expense.split_with[0];
+                    
+                    const otherIsMe = isMe(otherMember.name, otherMember.id);
                     
                     if (creatorIsMe) {
-                      lentText = `você emprestou a ${shortName(firstSplit.name, firstSplit.id)}`;
-                      lentAmount = `R$${formatAmount(firstSplit.splitAmount)}`;
+                      lentText = `você emprestou a ${shortName(otherMember.name, otherMember.id)}`;
+                      lentAmount = `R$${formatAmount(otherMember.splitAmount)}`;
                       lentClass = 'text-green-500 font-medium';
-                    } else if (splitIsMe) {
+                    } else if (otherIsMe) {
                       lentText = `${creatorStr} emprestou a você`;
-                      lentAmount = `R$${formatAmount(firstSplit.splitAmount)}`;
+                      lentAmount = `R$${formatAmount(otherMember.splitAmount)}`;
                       lentClass = 'text-red-500 font-medium';
                     } else {
-                      lentText = `${creatorStr} emprestou a ${shortName(firstSplit.name, firstSplit.id)}`;
-                      lentAmount = `R$${formatAmount(firstSplit.splitAmount)}`;
+                      lentText = `${creatorStr} emprestou a ${shortName(otherMember.name, otherMember.id)}`;
+                      lentAmount = `R$${formatAmount(otherMember.splitAmount)}`;
                     }
                   } else if (isPayment) {
                     lentText = 'Pagamento';
