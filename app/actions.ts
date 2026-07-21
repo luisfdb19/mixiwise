@@ -27,6 +27,7 @@ interface ExpenseData {
   receiptData?: string;
   receiptType?: string;
   recurringExpenseId?: string;
+  currency?: string;
 }
 
 interface Balance {
@@ -35,6 +36,7 @@ interface Balance {
   creditor: string;
   creditorId?: string;
   amount: number;
+  currency: string;
 }
 
 interface Expense {
@@ -53,6 +55,7 @@ interface Expense {
   receipt_data?: string;
   receipt_type?: string;
   recurring_expense_id?: string;
+  currency: string;
 }
 
 export async function addExpense(expenseData: ExpenseData) {
@@ -67,6 +70,7 @@ export async function addExpense(expenseData: ExpenseData) {
     receiptData,
     receiptType,
     recurringExpenseId,
+    currency = 'BRL',
   } = expenseData;
 
   try {
@@ -81,12 +85,12 @@ export async function addExpense(expenseData: ExpenseData) {
     const dateValue = createdAt ? new Date(createdAt) : new Date();
     await sql`
       INSERT INTO expenses (
-        amount, description, group_id, split_percentage, created_by, split_with, created_at, receipt_data, receipt_type, recurring_expense_id
+        amount, description, group_id, split_percentage, created_by, split_with, created_at, receipt_data, receipt_type, recurring_expense_id, currency
       )
       VALUES (
         ${amount}, ${description}, ${groupId}, ${splitPercentage}, ${createdBy}, ${JSON.stringify(
       splitWithInfo
-    )}, ${dateValue}, ${receiptData || null}, ${receiptType || null}, ${recurringExpenseId || null}
+    )}, ${dateValue}, ${receiptData || null}, ${receiptType || null}, ${recurringExpenseId || null}, ${currency}
       )
     `;
 
@@ -103,14 +107,14 @@ export async function getGroupData(groupId: string, currentUserId: string, curre
     await processRecurringExpenses(groupId);
 
     const expenses = (await sql`
-      SELECT id, amount, description, created_by, split_with, created_at, split_percentage, receipt_data, receipt_type, recurring_expense_id
+      SELECT id, amount, description, created_by, split_with, created_at, split_percentage, receipt_data, receipt_type, recurring_expense_id, currency
       FROM expenses
       WHERE group_id = ${groupId}
       ORDER BY created_at DESC
     `) as Expense[];
 
     const balances: Balance[] = [];
-    const balanceMap = new Map<string, { amount: number; name: string }>();
+    const balanceMapsByCurrency = new Map<string, Map<string, { amount: number; name: string }>>();
 
     // Fetch all nicknames
     const nicknamesResult = (await sql`SELECT user_id, nickname FROM nicknames`) as NicknameRow[];
@@ -193,6 +197,12 @@ export async function getGroupData(groupId: string, currentUserId: string, curre
       const creatorId = canonicalIdMap.get(expense.created_by) || expense.created_by;
       const creatorName = userMap.get(creatorId) || 'Unknown';
 
+      const currency = expense.currency || 'BRL';
+      if (!balanceMapsByCurrency.has(currency)) {
+        balanceMapsByCurrency.set(currency, new Map<string, { amount: number; name: string }>());
+      }
+      const balanceMap = balanceMapsByCurrency.get(currency)!;
+
       // Update creator's balance
       const creatorBalance = balanceMap.get(creatorId) || {
         amount: 0,
@@ -215,40 +225,43 @@ export async function getGroupData(groupId: string, currentUserId: string, curre
       );
     });
 
-    const debtors: { id: string; name: string; amount: number }[] = [];
-    const creditors: { id: string; name: string; amount: number }[] = [];
+    balanceMapsByCurrency.forEach((balanceMap, currency) => {
+      const debtors: { id: string; name: string; amount: number }[] = [];
+      const creditors: { id: string; name: string; amount: number }[] = [];
 
-    balanceMap.forEach(({ amount, name }, id) => {
-      if (amount < -0.01) debtors.push({ id, name, amount: Math.abs(amount) });
-      if (amount > 0.01) creditors.push({ id, name, amount });
-    });
-
-    debtors.sort((a, b) => b.amount - a.amount);
-    creditors.sort((a, b) => b.amount - a.amount);
-
-    let d = 0;
-    let c = 0;
-
-    while (d < debtors.length && c < creditors.length) {
-      const debtor = debtors[d];
-      const creditor = creditors[c];
-      
-      const settledAmount = Math.min(debtor.amount, creditor.amount);
-      
-      balances.push({
-        debtor: debtor.name,
-        debtorId: debtor.id,
-        creditor: creditor.name,
-        creditorId: creditor.id,
-        amount: settledAmount
+      balanceMap.forEach(({ amount, name }, id) => {
+        if (amount < -0.01) debtors.push({ id, name, amount: Math.abs(amount) });
+        if (amount > 0.01) creditors.push({ id, name, amount });
       });
-      
-      debtor.amount -= settledAmount;
-      creditor.amount -= settledAmount;
-      
-      if (debtor.amount < 0.01) d++;
-      if (creditor.amount < 0.01) c++;
-    }
+
+      debtors.sort((a, b) => b.amount - a.amount);
+      creditors.sort((a, b) => b.amount - a.amount);
+
+      let d = 0;
+      let c = 0;
+
+      while (d < debtors.length && c < creditors.length) {
+        const debtor = debtors[d];
+        const creditor = creditors[c];
+        
+        const settledAmount = Math.min(debtor.amount, creditor.amount);
+        
+        balances.push({
+          debtor: debtor.name,
+          debtorId: debtor.id,
+          creditor: creditor.name,
+          creditorId: creditor.id,
+          amount: settledAmount,
+          currency
+        });
+        
+        debtor.amount -= settledAmount;
+        creditor.amount -= settledAmount;
+        
+        if (debtor.amount < 0.01) d++;
+        if (creditor.amount < 0.01) c++;
+      }
+    });
 
     return { expenses, balances };
   } catch (error) {
@@ -277,8 +290,9 @@ export async function updateExpense(expenseId: string, expenseData: {
   splitWith: SplitMember[];
   createdBy?: string;
   createdAt?: string;
+  currency?: string;
 }) {
-  const { amount, description, splitPercentage, splitWith, createdBy, createdAt } = expenseData;
+  const { amount, description, splitPercentage, splitWith, createdBy, createdAt, currency } = expenseData;
 
   try {
     const splitWithInfo = splitWith.map((member) => ({
@@ -290,45 +304,97 @@ export async function updateExpense(expenseId: string, expenseData: {
     const dateValue = createdAt ? new Date(createdAt) : null;
 
     if (createdBy && dateValue) {
-      await sql`
-        UPDATE expenses
-        SET amount = ${amount},
-            description = ${description},
-            split_percentage = ${splitPercentage},
-            split_with = ${JSON.stringify(splitWithInfo)},
-            created_by = ${createdBy},
-            created_at = ${dateValue}
-        WHERE id = ${expenseId}
-      `;
+      if (currency) {
+        await sql`
+          UPDATE expenses
+          SET amount = ${amount},
+              description = ${description},
+              split_percentage = ${splitPercentage},
+              split_with = ${JSON.stringify(splitWithInfo)},
+              created_by = ${createdBy},
+              created_at = ${dateValue},
+              currency = ${currency}
+          WHERE id = ${expenseId}
+        `;
+      } else {
+        await sql`
+          UPDATE expenses
+          SET amount = ${amount},
+              description = ${description},
+              split_percentage = ${splitPercentage},
+              split_with = ${JSON.stringify(splitWithInfo)},
+              created_by = ${createdBy},
+              created_at = ${dateValue}
+          WHERE id = ${expenseId}
+        `;
+      }
     } else if (createdBy) {
-      await sql`
-        UPDATE expenses
-        SET amount = ${amount},
-            description = ${description},
-            split_percentage = ${splitPercentage},
-            split_with = ${JSON.stringify(splitWithInfo)},
-            created_by = ${createdBy}
-        WHERE id = ${expenseId}
-      `;
+      if (currency) {
+        await sql`
+          UPDATE expenses
+          SET amount = ${amount},
+              description = ${description},
+              split_percentage = ${splitPercentage},
+              split_with = ${JSON.stringify(splitWithInfo)},
+              created_by = ${createdBy},
+              currency = ${currency}
+          WHERE id = ${expenseId}
+        `;
+      } else {
+        await sql`
+          UPDATE expenses
+          SET amount = ${amount},
+              description = ${description},
+              split_percentage = ${splitPercentage},
+              split_with = ${JSON.stringify(splitWithInfo)},
+              created_by = ${createdBy}
+          WHERE id = ${expenseId}
+        `;
+      }
     } else if (dateValue) {
-      await sql`
-        UPDATE expenses
-        SET amount = ${amount},
-            description = ${description},
-            split_percentage = ${splitPercentage},
-            split_with = ${JSON.stringify(splitWithInfo)},
-            created_at = ${dateValue}
-        WHERE id = ${expenseId}
-      `;
+      if (currency) {
+        await sql`
+          UPDATE expenses
+          SET amount = ${amount},
+              description = ${description},
+              split_percentage = ${splitPercentage},
+              split_with = ${JSON.stringify(splitWithInfo)},
+              created_at = ${dateValue},
+              currency = ${currency}
+          WHERE id = ${expenseId}
+        `;
+      } else {
+        await sql`
+          UPDATE expenses
+          SET amount = ${amount},
+              description = ${description},
+              split_percentage = ${splitPercentage},
+              split_with = ${JSON.stringify(splitWithInfo)},
+              created_at = ${dateValue}
+          WHERE id = ${expenseId}
+        `;
+      }
     } else {
-      await sql`
-        UPDATE expenses
-        SET amount = ${amount},
-            description = ${description},
-            split_percentage = ${splitPercentage},
-            split_with = ${JSON.stringify(splitWithInfo)}
-        WHERE id = ${expenseId}
-      `;
+      if (currency) {
+        await sql`
+          UPDATE expenses
+          SET amount = ${amount},
+              description = ${description},
+              split_percentage = ${splitPercentage},
+              split_with = ${JSON.stringify(splitWithInfo)},
+              currency = ${currency}
+          WHERE id = ${expenseId}
+        `;
+      } else {
+        await sql`
+          UPDATE expenses
+          SET amount = ${amount},
+              description = ${description},
+              split_percentage = ${splitPercentage},
+              split_with = ${JSON.stringify(splitWithInfo)}
+          WHERE id = ${expenseId}
+        `;
+      }
     }
 
     return { success: true };
@@ -346,6 +412,7 @@ interface ImportedExpense {
   splitWith: { id: string; name: string; splitAmount: number }[];
   createdBy: string;
   date: string;
+  currency?: string;
 }
 
 export async function importExpenses(expenses: ImportedExpense[]) {
@@ -354,12 +421,12 @@ export async function importExpenses(expenses: ImportedExpense[]) {
     for (const expense of expenses) {
       await sql`
         INSERT INTO expenses (
-          amount, description, group_id, split_percentage, created_by, split_with, created_at
+          amount, description, group_id, split_percentage, created_by, split_with, created_at, currency
         )
         VALUES (
           ${expense.amount}, ${expense.description}, ${expense.groupId},
           ${expense.splitPercentage}, ${expense.createdBy},
-          ${JSON.stringify(expense.splitWith)}, ${expense.date}
+          ${JSON.stringify(expense.splitWith)}, ${expense.date}, ${expense.currency || 'BRL'}
         )
       `;
       importedCount++;
@@ -420,16 +487,17 @@ export async function createRecurringExpense(data: {
   intervalUnit: 'month' | 'year';
   nextOccurrence: string;
   totalInstallments: number | null;
+  currency?: string;
 }) {
   try {
-    const { groupId, amount, description, splitPercentage, splitWith, createdBy, intervalUnit, nextOccurrence, totalInstallments } = data;
+    const { groupId, amount, description, splitPercentage, splitWith, createdBy, intervalUnit, nextOccurrence, totalInstallments, currency = 'BRL' } = data;
     
     const result = await sql`
       INSERT INTO recurring_expenses (
-        group_id, amount, description, split_percentage, split_with, created_by, interval_unit, next_occurrence, total_installments, current_installment
+        group_id, amount, description, split_percentage, split_with, created_by, interval_unit, next_occurrence, total_installments, current_installment, currency
       )
       VALUES (
-        ${groupId}, ${amount}, ${description}, ${splitPercentage}, ${JSON.stringify(splitWith)}::jsonb, ${createdBy}, ${intervalUnit}, ${new Date(nextOccurrence)}, ${totalInstallments}, 2
+        ${groupId}, ${amount}, ${description}, ${splitPercentage}, ${JSON.stringify(splitWith)}::jsonb, ${createdBy}, ${intervalUnit}, ${new Date(nextOccurrence)}, ${totalInstallments}, 2, ${currency}
       )
       RETURNING id
     `;
@@ -443,7 +511,7 @@ export async function createRecurringExpense(data: {
 export async function getRecurringExpenses(groupId: string) {
   try {
     const result = await sql`
-      SELECT id, group_id, amount, description, split_percentage, split_with, created_by, interval_unit, next_occurrence, total_installments, current_installment, active, created_at
+      SELECT id, group_id, amount, description, split_percentage, split_with, created_by, interval_unit, next_occurrence, total_installments, current_installment, active, created_at, currency
       FROM recurring_expenses
       WHERE group_id = ${groupId}
       ORDER BY created_at DESC
@@ -462,6 +530,7 @@ export async function getRecurringExpenses(groupId: string) {
       current_installment: number;
       active: boolean;
       created_at: string;
+      currency: string;
     }[];
   } catch (error) {
     console.error('Error fetching recurring expenses:', error);
@@ -500,7 +569,7 @@ export async function processRecurringExpenses(groupId: string) {
   try {
     // Get all active recurring expenses for this group
     const activeRules = await sql`
-      SELECT id, group_id, amount, description, split_percentage, split_with, created_by, interval_unit, next_occurrence, total_installments, current_installment
+      SELECT id, group_id, amount, description, split_percentage, split_with, created_by, interval_unit, next_occurrence, total_installments, current_installment, currency
       FROM recurring_expenses
       WHERE group_id = ${groupId} AND active = true
     `;
@@ -531,10 +600,10 @@ export async function processRecurringExpenses(groupId: string) {
 
         await sql`
           INSERT INTO expenses (
-            amount, description, group_id, split_percentage, created_by, split_with, created_at, recurring_expense_id
+            amount, description, group_id, split_percentage, created_by, split_with, created_at, recurring_expense_id, currency
           )
           VALUES (
-            ${rule.amount}, ${generatedDesc}, ${rule.group_id}, ${rule.split_percentage}, ${rule.created_by}, ${JSON.stringify(splitWithInfo)}::jsonb, ${nextDate}, ${rule.id}
+            ${rule.amount}, ${generatedDesc}, ${rule.group_id}, ${rule.split_percentage}, ${rule.created_by}, ${JSON.stringify(splitWithInfo)}::jsonb, ${nextDate}, ${rule.id}, ${rule.currency || 'BRL'}
           )
         `;
 
@@ -574,7 +643,7 @@ export async function getRecurringExpenseDetails(recurringExpenseId: string) {
   try {
     // Get the recurring rule
     const rules = await sql`
-      SELECT id, group_id, amount, description, split_percentage, split_with, created_by, interval_unit, next_occurrence, total_installments, current_installment, active, created_at
+      SELECT id, group_id, amount, description, split_percentage, split_with, created_by, interval_unit, next_occurrence, total_installments, current_installment, active, created_at, currency
       FROM recurring_expenses
       WHERE id = ${recurringExpenseId}
     `;
@@ -597,6 +666,7 @@ export async function getRecurringExpenseDetails(recurringExpenseId: string) {
       current_installment: number;
       active: boolean;
       created_at: string;
+      currency: string;
     };
 
     // Get all installments generated from this rule

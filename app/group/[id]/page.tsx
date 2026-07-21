@@ -16,6 +16,7 @@ import SettleUpDialog from '@/components/SettleUpDialog';
 import AddExpenseDialog from '@/components/AddExpenseDialog';
 import RecurringExpenseDetailDialog from '@/components/RecurringExpenseDetailDialog';
 import UserStatement from '@/components/UserStatement';
+import { formatCurrency } from '@/lib/currency';
 
 interface Balance {
   debtor: string;
@@ -23,6 +24,7 @@ interface Balance {
   creditor: string;
   creditorId?: string;
   amount: number;
+  currency?: string;
 }
 
 interface Expense {
@@ -40,6 +42,7 @@ interface Expense {
   receipt_data?: string;
   receipt_type?: string;
   recurring_expense_id?: string;
+  currency?: string;
 }
 
 const formatAmount = (amount: number | string) => {
@@ -244,40 +247,56 @@ export default function GroupPage() {
           <div>
             <h2 className="text-xl font-bold mb-4 text-gray-800">Balances</h2>
             {balances.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {balances.map((balance, index) => {
-                  const amIDebtor = isMe(balance.debtor, balance.debtorId);
-                  const amICreditor = isMe(balance.creditor, balance.creditorId);
-                  
-                  let text = '';
-                  let amountClass = 'text-gray-900';
-                  
-                  if (amIDebtor) {
-                    text = `você deve a ${shortName(balance.creditor, balance.creditorId)}`;
-                    amountClass = 'text-red-500';
-                  } else if (amICreditor) {
-                    text = `${shortName(balance.debtor, balance.debtorId)} deve a você`;
-                    amountClass = 'text-green-500';
-                  } else {
-                    text = `${shortName(balance.debtor, balance.debtorId)} deve a ${shortName(balance.creditor, balance.creditorId)}`;
-                  }
+              <div className="space-y-6">
+                {Object.entries(
+                  balances.reduce((acc, balance) => {
+                    const curr = balance.currency || 'BRL';
+                    if (!acc[curr]) acc[curr] = [];
+                    acc[curr].push(balance);
+                    return acc;
+                  }, {} as Record<string, Balance[]>)
+                ).map(([currency, currencyBalances]) => (
+                  <div key={currency}>
+                    {Object.keys(balances.reduce((acc, b) => ({...acc, [b.currency || 'BRL']: true}), {})).length > 1 && (
+                      <h3 className="text-md font-semibold mb-3 text-gray-600">{currency}</h3>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {currencyBalances.map((balance, index) => {
+                        const amIDebtor = isMe(balance.debtor, balance.debtorId);
+                        const amICreditor = isMe(balance.creditor, balance.creditorId);
+                        
+                        let text = '';
+                        let amountClass = 'text-gray-900';
+                        
+                        if (amIDebtor) {
+                          text = `você deve a ${shortName(balance.creditor, balance.creditorId)}`;
+                          amountClass = 'text-red-500';
+                        } else if (amICreditor) {
+                          text = `${shortName(balance.debtor, balance.debtorId)} deve a você`;
+                          amountClass = 'text-green-500';
+                        } else {
+                          text = `${shortName(balance.debtor, balance.debtorId)} deve a ${shortName(balance.creditor, balance.creditorId)}`;
+                        }
 
-                  return (
-                    <Card key={index} className="shadow-sm border-0 ring-1 ring-gray-200 overflow-hidden">
-                      <CardContent className="flex items-center p-3 sm:p-4">
-                        <div className={`h-9 w-9 sm:h-12 sm:w-12 ${getRandomColor(balance.debtor)} rounded-full mr-3 sm:mr-4 flex items-center justify-center text-white font-bold text-xs sm:text-lg flex-shrink-0`}>
-                          {getInitials(balance.debtor)}
-                        </div>
-                        <div className="min-w-0 flex-grow">
-                          <p className="text-xs sm:text-sm text-gray-500 font-medium truncate">{text}</p>
-                          <p className={`text-lg sm:text-xl font-bold ${amountClass}`}>
-                            R${formatAmount(balance.amount)}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                        return (
+                          <Card key={`${currency}-${index}`} className="shadow-sm border-0 ring-1 ring-gray-200 overflow-hidden">
+                            <CardContent className="flex items-center p-3 sm:p-4">
+                              <div className={`h-9 w-9 sm:h-12 sm:w-12 ${getRandomColor(balance.debtor)} rounded-full mr-3 sm:mr-4 flex items-center justify-center text-white font-bold text-xs sm:text-lg flex-shrink-0`}>
+                                {getInitials(balance.debtor)}
+                              </div>
+                              <div className="min-w-0 flex-grow">
+                                <p className="text-xs sm:text-sm text-gray-500 font-medium truncate">{text}</p>
+                                <p className={`text-lg sm:text-xl font-bold ${amountClass}`}>
+                                  {formatCurrency(balance.amount, currency)}
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-gray-500 text-sm">🌟 Tudo zerado! Ninguém deve nada. 🎉</p>
@@ -310,19 +329,19 @@ export default function GroupPage() {
                     
                     if (creatorIsMe) {
                       lentText = `você emprestou a ${shortName(otherMember.name, otherMember.id)}`;
-                      lentAmount = `R$${formatAmount(otherMember.splitAmount)}`;
+                      lentAmount = formatCurrency(otherMember.splitAmount, expense.currency || 'BRL');
                       lentClass = 'text-green-500 font-medium';
                     } else if (otherIsMe) {
                       lentText = `${creatorStr} emprestou a você`;
-                      lentAmount = `R$${formatAmount(otherMember.splitAmount)}`;
+                      lentAmount = formatCurrency(otherMember.splitAmount, expense.currency || 'BRL');
                       lentClass = 'text-red-500 font-medium';
                     } else {
                       lentText = `${creatorStr} emprestou a ${shortName(otherMember.name, otherMember.id)}`;
-                      lentAmount = `R$${formatAmount(otherMember.splitAmount)}`;
+                      lentAmount = formatCurrency(otherMember.splitAmount, expense.currency || 'BRL');
                     }
                   } else if (isPayment) {
                     lentText = 'Pagamento';
-                    lentAmount = `R$${formatAmount(expense.amount)}`;
+                    lentAmount = formatCurrency(expense.amount, expense.currency || 'BRL');
                     lentClass = 'text-green-500 font-medium';
                   }
 
@@ -363,7 +382,7 @@ export default function GroupPage() {
                             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 mt-0.5 min-w-0 overflow-hidden">
                               <span className="truncate text-[10px] sm:text-xs text-gray-500 leading-tight block">
                                 <span>{creatorIsMe ? 'você' : creatorStr} pagou </span>
-                                <span className="font-semibold text-gray-800">R${formatAmount(expense.amount)}</span>
+                                <span className="font-semibold text-gray-800">{formatCurrency(expense.amount, expense.currency || 'BRL')}</span>
                               </span>
                               {lentText && (
                                 <span className={`truncate text-[10px] sm:text-xs leading-tight block ${lentClass}`}>

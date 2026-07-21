@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { FileText, Calendar, Plus, X, Paperclip } from 'lucide-react';
 import { addExpense, updateExpense, createRecurringExpense } from '@/app/actions';
+import { formatCurrency, getCurrencySymbol, getSupportedCurrencies } from '@/lib/currency';
 
 const formatAmount = (amount: number | string) => {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -39,6 +40,7 @@ interface ExpenseToEdit {
   receipt_data?: string;
   receipt_type?: string;
   split_percentage?: number;
+  currency?: string;
 }
 
 interface AddExpenseDialogProps {
@@ -75,6 +77,7 @@ export default function AddExpenseDialog({
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [receiptData, setReceiptData] = useState<string | null>(null);
   const [receiptType, setReceiptType] = useState<string | null>(null);
+  const [currency, setCurrency] = useState<string>('BRL');
   
   const [showPayerDropdown, setShowPayerDropdown] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -143,6 +146,7 @@ export default function AddExpenseDialog({
         );
         setReceiptData(expenseToEdit.receipt_data || null);
         setReceiptType(expenseToEdit.receipt_type || null);
+        setCurrency(expenseToEdit.currency || 'BRL');
       } else {
         setSelectedMembers(members);
         if (currentUser) {
@@ -158,6 +162,7 @@ export default function AddExpenseDialog({
         setDate(new Date().toISOString().split('T')[0]);
         setReceiptData(null);
         setReceiptType(null);
+        setCurrency('BRL');
         setIsRecurring(false);
         setRecurrenceInterval('month');
         setIsInstallment(false);
@@ -240,6 +245,7 @@ export default function AddExpenseDialog({
     if (expenseToEdit) {
       const result = await updateExpense(expenseToEdit.id, {
         amount: numAmount,
+        currency,
         description,
         splitPercentage: 100,
         splitWith: splitWithWithAmounts,
@@ -280,6 +286,7 @@ export default function AddExpenseDialog({
         const ruleResult = await createRecurringExpense({
           groupId,
           amount: finalAmount,
+          currency,
           description,
           splitPercentage: 100,
           splitWith: firstSplitWith,
@@ -297,6 +304,7 @@ export default function AddExpenseDialog({
         // 3. Add the first occurrence linked to the rule
         const firstResult = await addExpense({
           amount: finalAmount,
+          currency,
           description: initialDescription,
           groupId,
           splitPercentage: 100,
@@ -318,6 +326,7 @@ export default function AddExpenseDialog({
       } else {
         const result = await addExpense({
           amount: numAmount,
+          currency,
           description,
           groupId,
           splitPercentage: 100, // 100% of expense total is split
@@ -476,7 +485,17 @@ export default function AddExpenseDialog({
                 style={{ fontSize: '16px' }}
               />
               <div className="flex items-center gap-1">
-                <span className="text-xl font-bold text-gray-700">R$</span>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="bg-transparent text-xl font-bold text-gray-700 focus:outline-none cursor-pointer appearance-none pr-1"
+                >
+                  {getSupportedCurrencies().map(c => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.code}
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="number"
                   placeholder="0,00"
@@ -607,7 +626,7 @@ export default function AddExpenseDialog({
                           </div>
                         )}
                         <span className={`text-xs font-bold ${isSelected ? 'text-gray-900' : 'text-gray-300'}`}>
-                          R${formatAmount(displayShare)}
+                          {formatCurrency(displayShare, currency)}
                         </span>
                       </div>
                     </div>
@@ -757,7 +776,7 @@ export default function AddExpenseDialog({
 
                   {isInstallment && numAmount > 0 && (
                     <p className="text-[10px] text-gray-400 font-semibold text-right">
-                      Serão geradas {installmentsCount} parcelas de R$ {formatAmount(numAmount / (parseInt(installmentsCount) || 2))} cada.
+                      Serão geradas {installmentsCount} parcelas de {formatCurrency(numAmount / (parseInt(installmentsCount) || 2), currency)} cada.
                     </p>
                   )}
                 </div>

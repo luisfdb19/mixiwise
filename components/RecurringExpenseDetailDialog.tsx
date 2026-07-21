@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw, Pause, Play, Trash2, Pencil, X, Calendar, Check } from 'lucide-react';
 import { getRecurringExpenseDetails, toggleRecurringExpenseStatus, deleteRecurringExpense } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/currency';
 
 interface RecurringExpenseDetailDialogProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ interface RecurringRule {
   current_installment: number;
   active: boolean;
   created_at: string;
+  currency?: string;
 }
 
 interface Installment {
@@ -195,14 +197,14 @@ export default function RecurringExpenseDetailDialog({
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Valor / parcela</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">R${formatAmount(rule.amount)}</p>
+                  <p className="text-lg font-bold text-gray-900 mt-0.5">{formatCurrency(rule.amount, rule.currency || 'BRL')}</p>
                   <p className="text-[10px] text-gray-400 font-medium">/ {rule.interval_unit === 'month' ? 'mês' : 'ano'}</p>
                 </div>
                 {totalValue && (
                   <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Valor total</p>
-                    <p className="text-lg font-bold text-gray-900 mt-0.5">R${formatAmount(totalValue)}</p>
-                    <p className="text-[10px] text-gray-400 font-medium">{totalInstallments}x de R${formatAmount(rule.amount)}</p>
+                    <p className="text-lg font-bold text-gray-900 mt-0.5">{formatCurrency(totalValue, rule.currency || 'BRL')}</p>
+                    <p className="text-[10px] text-gray-400 font-medium">{totalInstallments}x de {formatCurrency(rule.amount, rule.currency || 'BRL')}</p>
                   </div>
                 )}
                 {!totalValue && (
@@ -257,7 +259,7 @@ export default function RecurringExpenseDetailDialog({
                     <span className="text-xs font-medium text-gray-700">
                       {member.id === currentUserId ? 'você' : member.name.split(' ')[0]}
                     </span>
-                    <span className="text-xs font-bold text-gray-900">R${formatAmount(member.splitAmount)}</span>
+                    <span className="text-xs font-bold text-gray-900">{formatCurrency(member.splitAmount, rule.currency || 'BRL')}</span>
                   </div>
                 ))}
               </div>

@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useOrganizationList, useUser } from '@clerk/nextjs';
 import { Upload, FileText, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { importExpenses } from '../actions';
+import { formatCurrency } from '@/lib/currency';
 
 interface Organization {
   id: string;
@@ -234,6 +235,7 @@ export default function ImportPage() {
 
         return {
           amount: expense.cost,
+          currency: expense.currency || 'BRL',
           description: expense.category
             ? `${expense.description} (${expense.category})`
             : expense.description,
@@ -383,7 +385,7 @@ export default function ImportPage() {
             <div className="bg-white border rounded-lg p-4">
               <p className="text-sm text-gray-500">Valor total</p>
               <p className="text-2xl font-bold text-gray-900">
-                R$ {totalAmount.toFixed(2)}
+                {formatCurrency(totalAmount, parsedExpenses[0]?.currency || 'BRL')}
               </p>
             </div>
             <div className="bg-white border rounded-lg p-4">
@@ -471,7 +473,7 @@ export default function ImportPage() {
                       <td className="p-3 text-gray-900">{expense.description}</td>
                       <td className="p-3 text-gray-500">{expense.category}</td>
                       <td className="p-3 text-gray-900 text-right whitespace-nowrap">
-                        R$ {expense.cost.toFixed(2)}
+                        {formatCurrency(expense.cost, expense.currency || 'BRL')}
                       </td>
                       <td className="p-3 text-green-700 whitespace-nowrap">
                         {expense.payer.split(' ')[0]}
@@ -480,7 +482,7 @@ export default function ImportPage() {
                         {expense.owes
                           .map(
                             (o) =>
-                              `${o.name.split(' ')[0]} (R$${o.amount.toFixed(2)})`
+                              `${o.name.split(' ')[0]} (${formatCurrency(o.amount, expense.currency || 'BRL')})`
                           )
                           .join(', ')}
                       </td>

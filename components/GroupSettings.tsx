@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getRecurringExpenses, toggleRecurringExpenseStatus, deleteRecurringExpense } from '@/app/actions';
+import { formatCurrency } from '@/lib/currency';
 
 interface RecurringExpense {
   id: string;
@@ -34,6 +35,7 @@ interface RecurringExpense {
   current_installment: number;
   active: boolean;
   created_at: string;
+  currency?: string;
 }
 
 export default function GroupSettings() {
@@ -137,7 +139,7 @@ export default function GroupSettings() {
                         {re.description}
                       </h4>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        R$ {parseFloat(re.amount.toString()).toFixed(2)} / {re.interval_unit === 'year' ? 'ano' : 'mês'} 
+                        {formatCurrency(re.amount, re.currency || 'BRL')} / {re.interval_unit === 'year' ? 'ano' : 'mês'} 
                         {re.total_installments ? ` (Parcela ${re.current_installment - 1} de ${re.total_installments})` : ' (Recorrência contínua)'}
                       </p>
                       <p className="text-[10px] text-gray-400 mt-0.5 font-semibold">
