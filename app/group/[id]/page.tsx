@@ -45,10 +45,7 @@ interface Expense {
   currency?: string;
 }
 
-const formatAmount = (amount: number | string) => {
-  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return numAmount.toFixed(2);
-};
+
 
 export default function GroupPage() {
   const { id } = useParams();

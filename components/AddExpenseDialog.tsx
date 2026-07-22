@@ -11,12 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { FileText, Calendar, Plus, X, Paperclip } from 'lucide-react';
 import { addExpense, updateExpense, createRecurringExpense } from '@/app/actions';
-import { formatCurrency, getCurrencySymbol, getSupportedCurrencies } from '@/lib/currency';
-
-const formatAmount = (amount: number | string) => {
-  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return numAmount.toFixed(2);
-};
+import { formatCurrency, getSupportedCurrencies } from '@/lib/currency';
 
 interface Member {
   id: string;

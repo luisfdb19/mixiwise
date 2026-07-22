@@ -59,7 +59,7 @@ export default function UserStatement({ expenses, currentUser }: UserStatementPr
       grouped[c].push(e);
     });
 
-    const results: Record<string, any[]> = {};
+    const results: Record<string, (Expense & { netImpact: number; runningBalance: number })[]> = {};
 
     for (const [currency, currExpenses] of Object.entries(grouped)) {
       // Sort expenses chronologically (oldest first)

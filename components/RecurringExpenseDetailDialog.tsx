@@ -45,10 +45,7 @@ interface Installment {
   created_at: string;
 }
 
-const formatAmount = (amount: number | string) => {
-  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return numAmount.toFixed(2);
-};
+
 
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString('pt-BR', {
