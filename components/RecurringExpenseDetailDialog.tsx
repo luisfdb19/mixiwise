@@ -147,7 +147,7 @@ export default function RecurringExpenseDetailDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md w-[calc(100vw-16px)] sm:w-full p-0 overflow-hidden border-0 rounded-xl shadow-2xl">
+      <DialogContent className="max-w-md w-[calc(100vw-16px)] sm:w-full p-0 overflow-hidden border-0 rounded-xl shadow-2xl [&>button]:hidden">
         {/* Header */}
         <DialogHeader className="bg-purple-600 text-white p-4 flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-2.5">

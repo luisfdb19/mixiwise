@@ -356,7 +356,7 @@ export default function AddExpenseDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md w-[calc(100vw-16px)] sm:w-full p-0 overflow-hidden border-0 rounded-xl shadow-2xl">
+      <DialogContent className="max-w-md w-[calc(100vw-16px)] sm:w-full p-0 overflow-hidden border-0 rounded-xl shadow-2xl [&>button]:hidden">
         {/* Header matching Splitwise's teal style */}
         <DialogHeader className="bg-teal-500 text-white p-4 flex flex-row items-center justify-between space-y-0">
           <DialogTitle className="text-xl font-bold text-white">
