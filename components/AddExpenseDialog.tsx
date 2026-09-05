@@ -82,6 +82,7 @@ export default function AddExpenseDialog({
   const [recurrenceInterval, setRecurrenceInterval] = useState<'month' | 'year'>('month');
   const [isInstallment, setIsInstallment] = useState(false);
   const [installmentsCount, setInstallmentsCount] = useState('12');
+  const [loading, setLoading] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -182,6 +183,8 @@ export default function AddExpenseDialog({
   };
 
   const handleSave = async () => {
+    if (loading) return;
+
     if (!description.trim()) {
       toast({ title: 'Aviso', description: 'Por favor, insira uma descrição.', variant: 'destructive' });
       return;
@@ -237,109 +240,117 @@ export default function AddExpenseDialog({
       };
     });
 
-    if (expenseToEdit) {
-      const result = await updateExpense(expenseToEdit.id, {
-        amount: numAmount,
-        currency,
-        description,
-        splitPercentage: 100,
-        splitWith: splitWithWithAmounts,
-        createdBy: payerId,
-        createdAt: new Date(date + 'T12:00:00').toISOString(),
-      });
+    setLoading(true);
 
-      if (result.success) {
-        toast({ title: 'Sucesso! 🎉', description: 'Despesa atualizada com sucesso.' });
-        onSuccess();
-        onClose();
-      } else {
-        toast({ title: 'Erro', description: 'Falha ao atualizar despesa.', variant: 'destructive' });
-      }
-    } else {
-      if (isRecurring) {
-        const count = isInstallment ? (parseInt(installmentsCount) || 2) : 1;
-        const finalAmount = isInstallment ? numAmount / count : numAmount;
-        const totalInst = isInstallment ? count : null;
-        const initialDescription = isInstallment ? `${description} (1/${count})` : description;
-
-        // Calculate mapped split amount for first installment
-        const firstSplitWith = splitWithWithAmounts.map(m => ({
-          id: m.id,
-          name: m.name,
-          splitAmount: isInstallment ? m.splitAmount / count : m.splitAmount
-        }));
-
-        // 1. Set the next occurrence date
-        const nextDate = new Date(date + 'T12:00:00');
-        if (recurrenceInterval === 'year') {
-          nextDate.setFullYear(nextDate.getFullYear() + 1);
-        } else {
-          nextDate.setMonth(nextDate.getMonth() + 1);
-        }
-
-        // 2. Create the recurrence rule FIRST to get the ID
-        const ruleResult = await createRecurringExpense({
-          groupId,
-          amount: finalAmount,
-          currency,
-          description,
-          splitPercentage: 100,
-          splitWith: firstSplitWith,
-          createdBy: payerId,
-          intervalUnit: recurrenceInterval,
-          nextOccurrence: nextDate.toISOString(),
-          totalInstallments: totalInst,
-        });
-
-        if (!ruleResult.success || !ruleResult.id) {
-          toast({ title: 'Erro', description: 'Falha ao agendar recorrência.', variant: 'destructive' });
-          return;
-        }
-
-        // 3. Add the first occurrence linked to the rule
-        const firstResult = await addExpense({
-          amount: finalAmount,
-          currency,
-          description: initialDescription,
-          groupId,
-          splitPercentage: 100,
-          splitWith: firstSplitWith,
-          createdBy: payerId,
-          createdAt: new Date(date + 'T12:00:00').toISOString(),
-          receiptData: receiptData || undefined,
-          receiptType: receiptType || undefined,
-          recurringExpenseId: ruleResult.id,
-        });
-
-        if (firstResult.success) {
-          toast({ title: 'Sucesso! 🎉', description: isInstallment ? 'Compra parcelada registrada com sucesso.' : 'Despesa recorrente agendada com sucesso.' });
-          onSuccess();
-          onClose();
-        } else {
-          toast({ title: 'Erro', description: 'Falha ao adicionar despesa inicial.', variant: 'destructive' });
-        }
-      } else {
-        const result = await addExpense({
+    try {
+      if (expenseToEdit) {
+        const result = await updateExpense(expenseToEdit.id, {
           amount: numAmount,
           currency,
           description,
-          groupId,
-          splitPercentage: 100, // 100% of expense total is split
+          splitPercentage: 100,
           splitWith: splitWithWithAmounts,
           createdBy: payerId,
           createdAt: new Date(date + 'T12:00:00').toISOString(),
-          receiptData: receiptData || undefined,
-          receiptType: receiptType || undefined,
         });
 
         if (result.success) {
-          toast({ title: 'Sucesso! 🎉', description: 'Despesa adicionada com sucesso.' });
+          toast({ title: 'Sucesso! 🎉', description: 'Despesa atualizada com sucesso.' });
           onSuccess();
           onClose();
         } else {
-          toast({ title: 'Erro', description: 'Falha ao adicionar despesa.', variant: 'destructive' });
+          toast({ title: 'Erro', description: 'Falha ao atualizar despesa.', variant: 'destructive' });
+        }
+      } else {
+        if (isRecurring) {
+          const count = isInstallment ? (parseInt(installmentsCount) || 2) : 1;
+          const finalAmount = isInstallment ? numAmount / count : numAmount;
+          const totalInst = isInstallment ? count : null;
+          const initialDescription = isInstallment ? `${description} (1/${count})` : description;
+
+          // Calculate mapped split amount for first installment
+          const firstSplitWith = splitWithWithAmounts.map(m => ({
+            id: m.id,
+            name: m.name,
+            splitAmount: isInstallment ? m.splitAmount / count : m.splitAmount
+          }));
+
+          // 1. Set the next occurrence date
+          const nextDate = new Date(date + 'T12:00:00');
+          if (recurrenceInterval === 'year') {
+            nextDate.setFullYear(nextDate.getFullYear() + 1);
+          } else {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+          }
+
+          // 2. Create the recurrence rule FIRST to get the ID
+          const ruleResult = await createRecurringExpense({
+            groupId,
+            amount: finalAmount,
+            currency,
+            description,
+            splitPercentage: 100,
+            splitWith: firstSplitWith,
+            createdBy: payerId,
+            intervalUnit: recurrenceInterval,
+            nextOccurrence: nextDate.toISOString(),
+            totalInstallments: totalInst,
+          });
+
+          if (!ruleResult.success || !ruleResult.id) {
+            toast({ title: 'Erro', description: 'Falha ao agendar recorrência.', variant: 'destructive' });
+            return;
+          }
+
+          // 3. Add the first occurrence linked to the rule
+          const firstResult = await addExpense({
+            amount: finalAmount,
+            currency,
+            description: initialDescription,
+            groupId,
+            splitPercentage: 100,
+            splitWith: firstSplitWith,
+            createdBy: payerId,
+            createdAt: new Date(date + 'T12:00:00').toISOString(),
+            receiptData: receiptData || undefined,
+            receiptType: receiptType || undefined,
+            recurringExpenseId: ruleResult.id,
+          });
+
+          if (firstResult.success) {
+            toast({ title: 'Sucesso! 🎉', description: isInstallment ? 'Compra parcelada registrada com sucesso.' : 'Despesa recorrente agendada com sucesso.' });
+            onSuccess();
+            onClose();
+          } else {
+            toast({ title: 'Erro', description: 'Falha ao adicionar despesa inicial.', variant: 'destructive' });
+          }
+        } else {
+          const result = await addExpense({
+            amount: numAmount,
+            currency,
+            description,
+            groupId,
+            splitPercentage: 100, // 100% of expense total is split
+            splitWith: splitWithWithAmounts,
+            createdBy: payerId,
+            createdAt: new Date(date + 'T12:00:00').toISOString(),
+            receiptData: receiptData || undefined,
+            receiptType: receiptType || undefined,
+          });
+
+          if (result.success) {
+            toast({ title: 'Sucesso! 🎉', description: 'Despesa adicionada com sucesso.' });
+            onSuccess();
+            onClose();
+          } else {
+            toast({ title: 'Erro', description: 'Falha ao adicionar despesa.', variant: 'destructive' });
+          }
         }
       }
+    } catch {
+      toast({ title: 'Erro', description: 'Ocorreu um erro inesperado ao salvar.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -784,17 +795,19 @@ export default function AddExpenseDialog({
             <Button
               type="button"
               variant="outline"
-              className="bg-white px-4 sm:px-6 rounded-lg text-gray-600 border border-gray-200 text-xs font-bold flex-1 sm:flex-none"
+              disabled={loading}
+              className="bg-white px-4 sm:px-6 rounded-lg text-gray-600 border border-gray-200 text-xs font-bold flex-1 sm:flex-none disabled:opacity-50"
               onClick={onClose}
             >
               Cancelar
             </Button>
             <Button
               type="button"
-              className="bg-teal-500 hover:bg-teal-600 text-white px-4 sm:px-6 rounded-lg text-xs font-bold flex-1 sm:flex-none"
+              disabled={loading}
+              className="bg-teal-500 hover:bg-teal-600 text-white px-4 sm:px-6 rounded-lg text-xs font-bold flex-1 sm:flex-none disabled:opacity-50"
               onClick={handleSave}
             >
-              Salvar
+              {loading ? 'Salvando...' : 'Salvar'}
             </Button>
           </div>
         </div>
