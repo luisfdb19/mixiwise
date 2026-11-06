@@ -78,7 +78,7 @@ export default function AddExpenseDialog({
   const [category, setCategory] = useState<string>('outros');
   const [isCategoryManual, setIsCategoryManual] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  
+
   const [showPayerDropdown, setShowPayerDropdown] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
 
@@ -119,7 +119,7 @@ export default function AddExpenseDialog({
           )
         );
         setPayerId(expenseToEdit.created_by);
-        
+
         // Detect custom percentages
         if (expenseToEdit.split_with && expenseToEdit.amount > 0) {
           const pcts: { [id: string]: string } = {};
@@ -305,14 +305,12 @@ export default function AddExpenseDialog({
             intervalUnit: recurrenceInterval,
             nextOccurrence: nextDate.toISOString(),
             totalInstallments: totalInst,
-            category,
           });
 
           if (!ruleResult.success || !ruleResult.id) {
             toast({ title: 'Erro', description: 'Falha ao agendar recorrência.', variant: 'destructive' });
             return;
           }
-
           // 3. Add the first occurrence linked to the rule
           const firstResult = await addExpense({
             amount: finalAmount,
@@ -396,11 +394,10 @@ export default function AddExpenseDialog({
           <div className="flex flex-col gap-1.5 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
             <button
               type="button"
-              className={`w-full py-1.5 px-4 rounded-lg text-xs font-bold transition-all text-center ${
-                splitMode === 'split'
+              className={`w-full py-1.5 px-4 rounded-lg text-xs font-bold transition-all text-center ${splitMode === 'split'
                   ? 'bg-teal-500 text-white shadow-sm'
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-              }`}
+                }`}
               onClick={() => {
                 setSplitMode('split');
                 setSelectedMembers(members);
@@ -410,11 +407,10 @@ export default function AddExpenseDialog({
             </button>
             <button
               type="button"
-              className={`w-full py-1.5 px-4 rounded-lg text-xs font-bold transition-all text-center ${
-                splitMode === 'you-owe-all'
+              className={`w-full py-1.5 px-4 rounded-lg text-xs font-bold transition-all text-center ${splitMode === 'you-owe-all'
                   ? 'bg-teal-500 text-white shadow-sm'
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-              }`}
+                }`}
               onClick={() => {
                 setSplitMode('you-owe-all');
                 if (currentUser) {
@@ -429,11 +425,10 @@ export default function AddExpenseDialog({
             </button>
             <button
               type="button"
-              className={`w-full py-1.5 px-4 rounded-lg text-xs font-bold transition-all text-center ${
-                splitMode === 'they-owe-all'
+              className={`w-full py-1.5 px-4 rounded-lg text-xs font-bold transition-all text-center ${splitMode === 'they-owe-all'
                   ? 'bg-teal-500 text-white shadow-sm'
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-              }`}
+                }`}
               onClick={() => {
                 setSplitMode('they-owe-all');
                 if (currentUser) {
@@ -557,9 +552,8 @@ export default function AddExpenseDialog({
                           setIsCategoryManual(true);
                           setShowCategoryPicker(false);
                         }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors ${
-                          category === cat.id ? 'bg-teal-50 text-teal-700 font-bold' : 'hover:bg-gray-50 text-gray-700'
-                        }`}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors ${category === cat.id ? 'bg-teal-50 text-teal-700 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                          }`}
                       >
                         <span className="flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
@@ -616,23 +610,21 @@ export default function AddExpenseDialog({
                 <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
                   Dividir {splitType === 'equal' ? 'igualmente' : 'por porcentagem'}
                 </h4>
-                
+
                 {/* Horizontal toggle button group for Equal/Percentage */}
                 <div className="flex border border-gray-200 rounded-md overflow-hidden bg-gray-50">
                   <button
                     type="button"
-                    className={`px-3 py-1 text-xs font-bold transition-all ${
-                      splitType === 'equal' ? 'bg-white text-teal-600 shadow-sm border-r border-l' : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                    className={`px-3 py-1 text-xs font-bold transition-all ${splitType === 'equal' ? 'bg-white text-teal-600 shadow-sm border-r border-l' : 'text-gray-500 hover:text-gray-700'
+                      }`}
                     onClick={() => setSplitType('equal')}
                   >
                     =
                   </button>
                   <button
                     type="button"
-                    className={`px-3 py-1 text-xs font-bold transition-all ${
-                      splitType === 'percentage' ? 'bg-white text-teal-600 shadow-sm border-r border-l' : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                    className={`px-3 py-1 text-xs font-bold transition-all ${splitType === 'percentage' ? 'bg-white text-teal-600 shadow-sm border-r border-l' : 'text-gray-500 hover:text-gray-700'
+                      }`}
                     onClick={() => setSplitType('percentage')}
                   >
                     %
@@ -712,7 +704,7 @@ export default function AddExpenseDialog({
                 className="bg-transparent border-0 outline-none cursor-pointer focus:ring-0 p-0 text-xs font-semibold text-gray-700"
               />
             </div>
-            
+
             <label className="relative inline-block border bg-white shadow-sm hover:bg-gray-50 transition-colors py-1.5 px-4 rounded-full text-xs font-bold text-gray-600 cursor-pointer flex items-center gap-1.5">
               <Paperclip size={14} className={receiptData ? "text-teal-500" : "text-gray-400"} />
               <span className={receiptData ? "text-teal-600" : "text-gray-700"}>

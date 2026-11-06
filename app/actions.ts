@@ -189,7 +189,7 @@ export async function getGroupData(groupId: string, currentUserId: string, curre
     expenses.forEach((expense) => {
       // Map creator name
       expense.created_by_name = userMap.get(expense.created_by) || expense.created_by;
-      
+
       // Update split member names in place
       expense.split_with.forEach((member) => {
         member.name = userMap.get(member.id) || userMap.get(member.name) || member.name;
@@ -250,9 +250,9 @@ export async function getGroupData(groupId: string, currentUserId: string, curre
       while (d < debtors.length && c < creditors.length) {
         const debtor = debtors[d];
         const creditor = creditors[c];
-        
+
         const settledAmount = Math.min(debtor.amount, creditor.amount);
-        
+
         balances.push({
           debtor: debtor.name,
           debtorId: debtor.id,
@@ -261,10 +261,10 @@ export async function getGroupData(groupId: string, currentUserId: string, curre
           amount: settledAmount,
           currency
         });
-        
+
         debtor.amount -= settledAmount;
         creditor.amount -= settledAmount;
-        
+
         if (debtor.amount < 0.01) d++;
         if (creditor.amount < 0.01) c++;
       }
@@ -504,10 +504,11 @@ export async function createRecurringExpense(data: {
   nextOccurrence: string;
   totalInstallments: number | null;
   currency?: string;
+  category?: string;
 }) {
   try {
     const { groupId, amount, description, splitPercentage, splitWith, createdBy, intervalUnit, nextOccurrence, totalInstallments, currency = 'BRL' } = data;
-    
+
     const result = await sql`
       INSERT INTO recurring_expenses (
         group_id, amount, description, split_percentage, split_with, created_by, interval_unit, next_occurrence, total_installments, current_installment, currency
