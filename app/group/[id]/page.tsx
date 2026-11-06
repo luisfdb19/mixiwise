@@ -1,7 +1,7 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Trash2, Paperclip, X, RefreshCw, Users, Settings } from 'lucide-react';
+import { Trash2, Paperclip, X, RefreshCw, Users, Settings, Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { useParams } from 'next/navigation';
 import { useOrganization, useOrganizationList, useUser } from '@clerk/nextjs';
@@ -66,6 +66,20 @@ export default function GroupPage() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
   const [recurringDetailExpense, setRecurringDetailExpense] = useState<Expense | null>(null);
+  const [showFab, setShowFab] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Show floating "Adicionar despesa" button when header scrolls out of view
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowFab(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading]);
 
   // Fetch organization members to pass to AddExpenseDialog
   useEffect(() => {
@@ -223,7 +237,7 @@ export default function GroupPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto flex-shrink-0">
+        <div ref={headerRef} className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto flex-shrink-0">
           <Button 
             className="bg-teal-500 hover:bg-teal-600 text-white shadow-sm font-semibold gap-1.5 text-xs sm:text-sm"
             onClick={() => setIsAddExpenseOpen(true)}
@@ -527,6 +541,18 @@ export default function GroupPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Floating "Adicionar despesa" button - appears when header scrolls out */}
+      {showFab && (
+        <button
+          onClick={() => setIsAddExpenseOpen(true)}
+          className="fixed bottom-6 right-6 z-50 bg-teal-500 hover:bg-teal-600 active:bg-teal-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 pl-4 pr-5 py-3 sm:bottom-8 sm:right-8 animate-in fade-in slide-in-from-bottom-4"
+          aria-label="Adicionar despesa"
+        >
+          <Plus size={20} strokeWidth={2.5} />
+          <span className="text-sm font-bold">Adicionar despesa</span>
+        </button>
+      )}
     </div>
   );
 }
