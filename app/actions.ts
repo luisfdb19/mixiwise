@@ -1,7 +1,9 @@
 'use server';
 
 import { neon } from '@neondatabase/serverless';
-import { clerkClient } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
+import { classifyExpense, sanitizeTransactionDescription } from '@/lib/categories';
+import { classifyBatchWithGemini, isGeminiAvailable } from '@/lib/gemini-categorizer';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -28,6 +30,7 @@ interface ExpenseData {
   receiptType?: string;
   recurringExpenseId?: string;
   currency?: string;
+  category?: string;
 }
 
 interface Balance {
@@ -56,6 +59,7 @@ interface Expense {
   receipt_type?: string;
   recurring_expense_id?: string;
   currency: string;
+  category?: string;
 }
 
 export async function addExpense(expenseData: ExpenseData) {
@@ -71,9 +75,12 @@ export async function addExpense(expenseData: ExpenseData) {
     receiptType,
     recurringExpenseId,
     currency = 'BRL',
+    category,
   } = expenseData;
 
   try {
+    const resolvedCategory = category || classifyExpense(description).categoryId;
+
     // Create a JSON object with member information and split amounts
     const splitWithInfo = splitWith.map((member) => ({
       id: member.id,
@@ -85,12 +92,12 @@ export async function addExpense(expenseData: ExpenseData) {
     const dateValue = createdAt ? new Date(createdAt) : new Date();
     await sql`
       INSERT INTO expenses (
-        amount, description, group_id, split_percentage, created_by, split_with, created_at, receipt_data, receipt_type, recurring_expense_id, currency
+        amount, description, group_id, split_percentage, created_by, split_with, created_at, receipt_data, receipt_type, recurring_expense_id, currency, category
       )
       VALUES (
         ${amount}, ${description}, ${groupId}, ${splitPercentage}, ${createdBy}, ${JSON.stringify(
       splitWithInfo
-    )}, ${dateValue}, ${receiptData || null}, ${receiptType || null}, ${recurringExpenseId || null}, ${currency}
+    )}, ${dateValue}, ${receiptData || null}, ${receiptType || null}, ${recurringExpenseId || null}, ${currency}, ${resolvedCategory}
       )
     `;
 
@@ -107,7 +114,7 @@ export async function getGroupData(groupId: string, currentUserId: string, curre
     await processRecurringExpenses(groupId);
 
     const expenses = (await sql`
-      SELECT id, amount, description, created_by, split_with, created_at, split_percentage, receipt_data, receipt_type, recurring_expense_id, currency
+      SELECT id, amount, description, created_by, split_with, created_at, split_percentage, receipt_data, receipt_type, recurring_expense_id, currency, COALESCE(category, 'outros') as category
       FROM expenses
       WHERE group_id = ${groupId}
       ORDER BY created_at DESC
@@ -685,4 +692,115 @@ export async function getRecurringExpenseDetails(recurringExpenseId: string) {
     console.error('Error fetching recurring expense details:', error);
     return { rule: null, installments: [] };
   }
+}
+
+export async function updateExpenseCategory(expenseId: string, category: string, groupId: string) {
+  try {
+    const { userId } = auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    await sql`
+      UPDATE expenses
+      SET category = ${category}
+      WHERE id = ${expenseId} AND group_id = ${groupId}
+    `;
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating expense category:', error);
+    return { success: false };
+  }
+}
+
+export async function batchAutoCategorizeExpenses(groupId: string) {
+  try {
+    const { userId } = auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized', updatedCount: 0, remainingPending: 0 };
+    }
+
+    // 1. Fetch all expenses for this group
+    const expenses = (await sql`
+      SELECT id, description, category
+      FROM expenses
+      WHERE group_id = ${groupId}
+    `) as { id: string; description: string; category: string | null }[];
+
+    // 2. Build group learning memory from previously user-categorized expenses
+    const learnedMemory: Record<string, string> = {};
+    expenses.forEach((e) => {
+      if (e.category && e.category !== 'outros' && e.description) {
+        const cleanKey = sanitizeTransactionDescription(e.description);
+        if (cleanKey) {
+          learnedMemory[cleanKey] = e.category;
+        }
+      }
+    });
+
+    // 3. Find uncategorized expenses
+    const pending = expenses.filter((e) => !e.category || e.category === 'outros');
+    if (pending.length === 0) {
+      return { success: true, updatedCount: 0, remainingPending: 0 };
+    }
+
+    let updatedCount = 0;
+    const stillPending: { id: string; description: string }[] = [];
+
+    // First pass: local memory and rules engine
+    for (const exp of pending) {
+      const pred = classifyExpense(exp.description, learnedMemory);
+      if (!pred.needsReview && pred.categoryId !== 'outros') {
+        await sql`
+          UPDATE expenses
+          SET category = ${pred.categoryId}
+          WHERE id = ${exp.id}
+        `;
+        updatedCount++;
+      } else {
+        stillPending.push(exp);
+      }
+    }
+
+    // Second pass: Gemini AI if configured and items remain
+    let aiCategorizedCount = 0;
+    if (isGeminiAvailable() && stillPending.length > 0) {
+      try {
+        const batch = stillPending.slice(0, 25);
+        const descriptions = batch.map((b) => b.description);
+        const aiResults = await classifyBatchWithGemini(descriptions);
+
+        for (const exp of batch) {
+          const aiItem = aiResults[exp.description];
+          if (aiItem && aiItem.category && aiItem.category !== 'outros') {
+            await sql`
+              UPDATE expenses
+              SET category = ${aiItem.category}
+              WHERE id = ${exp.id}
+            `;
+            aiCategorizedCount++;
+            updatedCount++;
+          }
+        }
+      } catch (aiError) {
+        console.error('Gemini batch classification error:', aiError);
+      }
+    }
+
+    const remainingPending = stillPending.length - aiCategorizedCount;
+
+    return {
+      success: true,
+      updatedCount,
+      remainingPending,
+      geminiUsed: isGeminiAvailable(),
+    };
+  } catch (error) {
+    console.error('Error in batchAutoCategorizeExpenses:', error);
+    return { success: false, updatedCount: 0, remainingPending: 0 };
+  }
+}
+
+export async function isGeminiAiConfigured() {
+  return isGeminiAvailable();
 }

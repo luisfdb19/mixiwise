@@ -9,9 +9,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Calendar, Plus, X, Paperclip } from 'lucide-react';
+import { FileText, Calendar, Plus, X, Paperclip, Tag } from 'lucide-react';
 import { addExpense, updateExpense, createRecurringExpense } from '@/app/actions';
 import { formatCurrency, getSupportedCurrencies } from '@/lib/currency';
+import { CATEGORY_LIST, getCategoryInfo, classifyExpense } from '@/lib/categories';
 
 interface Member {
   id: string;
@@ -36,6 +37,7 @@ interface ExpenseToEdit {
   receipt_type?: string;
   split_percentage?: number;
   currency?: string;
+  category?: string;
 }
 
 interface AddExpenseDialogProps {
@@ -73,6 +75,9 @@ export default function AddExpenseDialog({
   const [receiptData, setReceiptData] = useState<string | null>(null);
   const [receiptType, setReceiptType] = useState<string | null>(null);
   const [currency, setCurrency] = useState<string>('BRL');
+  const [category, setCategory] = useState<string>('outros');
+  const [isCategoryManual, setIsCategoryManual] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   
   const [showPayerDropdown, setShowPayerDropdown] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -143,6 +148,8 @@ export default function AddExpenseDialog({
         setReceiptData(expenseToEdit.receipt_data || null);
         setReceiptType(expenseToEdit.receipt_type || null);
         setCurrency(expenseToEdit.currency || 'BRL');
+        setCategory(expenseToEdit.category || 'outros');
+        setIsCategoryManual(Boolean(expenseToEdit.category && expenseToEdit.category !== 'outros'));
       } else {
         setSelectedMembers(members);
         if (currentUser) {
@@ -159,6 +166,8 @@ export default function AddExpenseDialog({
         setReceiptData(null);
         setReceiptType(null);
         setCurrency('BRL');
+        setCategory('outros');
+        setIsCategoryManual(false);
         setIsRecurring(false);
         setRecurrenceInterval('month');
         setIsInstallment(false);
@@ -247,6 +256,7 @@ export default function AddExpenseDialog({
         const result = await updateExpense(expenseToEdit.id, {
           amount: numAmount,
           currency,
+          category,
           description,
           splitPercentage: 100,
           splitWith: splitWithWithAmounts,
@@ -295,6 +305,7 @@ export default function AddExpenseDialog({
             intervalUnit: recurrenceInterval,
             nextOccurrence: nextDate.toISOString(),
             totalInstallments: totalInst,
+            category,
           });
 
           if (!ruleResult.success || !ruleResult.id) {
@@ -315,6 +326,7 @@ export default function AddExpenseDialog({
             receiptData: receiptData || undefined,
             receiptType: receiptType || undefined,
             recurringExpenseId: ruleResult.id,
+            category,
           });
 
           if (firstResult.success) {
@@ -330,6 +342,7 @@ export default function AddExpenseDialog({
             currency,
             description,
             groupId,
+            category,
             splitPercentage: 100, // 100% of expense total is split
             splitWith: splitWithWithAmounts,
             createdBy: payerId,
@@ -486,7 +499,16 @@ export default function AddExpenseDialog({
                 type="text"
                 placeholder="Insira a descrição"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDescription(val);
+                  if (!isCategoryManual) {
+                    const result = classifyExpense(val);
+                    if (!result.needsReview) {
+                      setCategory(result.categoryId);
+                    }
+                  }
+                }}
                 className="w-full border-b border-dashed border-gray-300 py-1 text-base font-semibold text-gray-900 focus:outline-none focus:border-teal-500 bg-transparent placeholder-gray-300"
                 style={{ fontSize: '16px' }}
               />
@@ -511,6 +533,43 @@ export default function AddExpenseDialog({
                   className="w-full text-2xl sm:text-3xl font-semibold text-gray-900 focus:outline-none bg-transparent placeholder-gray-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   style={{ fontSize: '24px' }}
                 />
+              </div>
+
+              {/* Category selector badge */}
+              <div className="relative pt-1 flex items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-gray-400">Categoria:</span>
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryPicker(!showCategoryPicker)}
+                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-all ${getCategoryInfo(category).bgLight} ${getCategoryInfo(category).textColor} ${getCategoryInfo(category).borderColor} hover:shadow-xs`}
+                >
+                  <Tag size={10} />
+                  <span>{getCategoryInfo(category).name}</span>
+                </button>
+                {showCategoryPicker && (
+                  <div className="absolute left-0 top-7 mt-1 bg-white border border-gray-200 shadow-xl rounded-xl p-1.5 z-30 w-56 grid grid-cols-1 gap-1 max-h-48 overflow-y-auto">
+                    {CATEGORY_LIST.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setCategory(cat.id);
+                          setIsCategoryManual(true);
+                          setShowCategoryPicker(false);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors ${
+                          category === cat.id ? 'bg-teal-50 text-teal-700 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
+                          {cat.name}
+                        </span>
+                        {category === cat.id && <span className="text-teal-600 text-[10px]">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

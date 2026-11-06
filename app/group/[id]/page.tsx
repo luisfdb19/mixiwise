@@ -16,7 +16,9 @@ import SettleUpDialog from '@/components/SettleUpDialog';
 import AddExpenseDialog from '@/components/AddExpenseDialog';
 import RecurringExpenseDetailDialog from '@/components/RecurringExpenseDetailDialog';
 import UserStatement from '@/components/UserStatement';
+import GroupReports from '@/components/GroupReports';
 import { formatCurrency } from '@/lib/currency';
+import { getCategoryInfo } from '@/lib/categories';
 
 interface Balance {
   debtor: string;
@@ -43,6 +45,7 @@ interface Expense {
   receipt_type?: string;
   recurring_expense_id?: string;
   currency?: string;
+  category?: string;
 }
 
 
@@ -252,6 +255,7 @@ export default function GroupPage() {
         <TabsList className="mb-6 bg-white border shadow-sm flex h-auto p-1">
           <TabsTrigger value="overview" className="flex-1 text-xs sm:text-sm py-2">Visão Geral</TabsTrigger>
           <TabsTrigger value="statement" className="flex-1 text-xs sm:text-sm py-2">Extrato</TabsTrigger>
+          <TabsTrigger value="reports" className="flex-1 text-xs sm:text-sm py-2">Relatórios</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-8">
@@ -381,14 +385,16 @@ export default function GroupPage() {
                           </div>
                           
                           <div className="flex-grow min-w-0 overflow-hidden pr-1 sm:pr-4">
-                            <h3 className="font-semibold text-gray-900 truncate text-xs sm:text-base leading-tight flex items-center gap-1">
+                            <h3 className="font-semibold text-gray-900 truncate text-xs sm:text-base leading-tight flex items-center gap-1.5">
                               {expense.recurring_expense_id && (
-                                <RefreshCw size={11} className="text-purple-400 flex-shrink-0 sm:hidden" />
+                                <RefreshCw size={11} className="text-purple-400 flex-shrink-0" />
                               )}
-                              {expense.recurring_expense_id && (
-                                <RefreshCw size={13} className="text-purple-400 flex-shrink-0 hidden sm:inline" />
+                              <span className="truncate">{expense.description}</span>
+                              {expense.category && expense.category !== 'outros' && (
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md border ${getCategoryInfo(expense.category).bgLight} ${getCategoryInfo(expense.category).textColor} ${getCategoryInfo(expense.category).borderColor} hidden sm:inline-block flex-shrink-0`}>
+                                  {getCategoryInfo(expense.category).name}
+                                </span>
                               )}
-                              {expense.description}
                             </h3>
                             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 mt-0.5 min-w-0 overflow-hidden">
                               <span className="truncate text-[10px] sm:text-xs text-gray-500 leading-tight block">
@@ -452,6 +458,26 @@ export default function GroupPage() {
           ) : (
             <div className="text-center py-8 text-gray-500">Carregando extrato...</div>
           )}
+        </TabsContent>
+
+        <TabsContent value="reports">
+          <GroupReports
+            expenses={expenses}
+            groupId={id as string}
+            currentUserId={user?.id}
+            onDataChanged={async () => {
+              if (id && user) {
+                const { expenses: updatedExpenses, balances: updatedBalances } = await getGroupData(
+                  id as string,
+                  user.id,
+                  user.fullName || 'You'
+                );
+                setExpenses(updatedExpenses);
+                setBalances(updatedBalances);
+                router.refresh();
+              }
+            }}
+          />
         </TabsContent>
 
         {isAdmin && (
