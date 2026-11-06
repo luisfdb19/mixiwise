@@ -767,8 +767,8 @@ export default function GroupReports({
                   </div>
                   <div className="bg-gray-50 rounded-xl p-2.5">
                     <p className="text-[10px] text-gray-400 font-bold uppercase">Mês mais econômico</p>
-                    <p className="font-bold text-gray-800">{(monthlyTimeline.lowestMonth as { fullName?: string, totalCents?: number })?.fullName || '--'}</p>
-                    <p className="font-extrabold text-gray-700">{formatCurrency(((monthlyTimeline.lowestMonth as { fullName?: string, totalCents?: number })?.totalCents || 0) / 100)}</p>
+                    <p className="font-bold text-gray-800">{(monthlyTimeline.lowestMonth as unknown as { fullName?: string, totalCents?: number })?.fullName || '--'}</p>
+                    <p className="font-extrabold text-gray-700">{formatCurrency(((monthlyTimeline.lowestMonth as unknown as { fullName?: string, totalCents?: number })?.totalCents || 0) / 100)}</p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-2.5">
                     <p className="text-[10px] text-gray-400 font-bold uppercase">Média mensal</p>
