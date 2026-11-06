@@ -631,8 +631,8 @@ export default function GroupReports({
                         key={cat.id}
                         onClick={() => setSelectedCategoryFilter(isSelected ? null : cat.id)}
                         className={`p-2.5 rounded-xl transition-all cursor-pointer border ${isSelected
-                            ? 'border-teal-400 bg-teal-50/30 ring-1 ring-teal-300'
-                            : 'border-transparent hover:bg-gray-50'
+                          ? 'border-teal-400 bg-teal-50/30 ring-1 ring-teal-300'
+                          : 'border-transparent hover:bg-gray-50'
                           }`}
                       >
                         <div className="flex justify-between items-center text-xs mb-1.5">
@@ -738,10 +738,10 @@ export default function GroupReports({
                         <div className="w-full max-w-[32px] flex flex-col justify-end h-full">
                           <div
                             className={`w-full rounded-t-lg transition-all duration-500 ${isPeak
-                                ? 'bg-gradient-to-t from-teal-600 to-teal-400 shadow-md'
-                                : m.totalCents > 0
-                                  ? 'bg-gradient-to-t from-gray-300 to-gray-400 group-hover:from-teal-400 group-hover:to-teal-500'
-                                  : 'bg-gray-100'
+                              ? 'bg-gradient-to-t from-teal-600 to-teal-400 shadow-md'
+                              : m.totalCents > 0
+                                ? 'bg-gradient-to-t from-gray-300 to-gray-400 group-hover:from-teal-400 group-hover:to-teal-500'
+                                : 'bg-gray-100'
                               }`}
                             style={{ height: `${heightPercent}%` }}
                           />
@@ -767,8 +767,8 @@ export default function GroupReports({
                   </div>
                   <div className="bg-gray-50 rounded-xl p-2.5">
                     <p className="text-[10px] text-gray-400 font-bold uppercase">Mês mais econômico</p>
-                    <p className="font-bold text-gray-800">{(monthlyTimeline.lowestMonth as any)?.fullName || '--'}</p>
-                    <p className="font-extrabold text-gray-700">{formatCurrency(((monthlyTimeline.lowestMonth as any)?.totalCents || 0) / 100)}</p>
+                    <p className="font-bold text-gray-800">{(monthlyTimeline.lowestMonth as { fullName?: string, totalCents?: number })?.fullName || '--'}</p>
+                    <p className="font-extrabold text-gray-700">{formatCurrency(((monthlyTimeline.lowestMonth as { fullName?: string, totalCents?: number })?.totalCents || 0) / 100)}</p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-2.5">
                     <p className="text-[10px] text-gray-400 font-bold uppercase">Média mensal</p>
@@ -859,10 +859,10 @@ export default function GroupReports({
                         <td className="py-3 px-3">
                           <span
                             className={`px-2 py-0.5 rounded font-black text-[11px] ${c.abcClass === 'A'
-                                ? 'bg-red-100 text-red-700 border border-red-200'
-                                : c.abcClass === 'B'
-                                  ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                                  : 'bg-blue-100 text-blue-700 border border-blue-200'
+                              ? 'bg-red-100 text-red-700 border border-red-200'
+                              : c.abcClass === 'B'
+                                ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                : 'bg-blue-100 text-blue-700 border border-blue-200'
                               }`}
                           >
                             Classe {c.abcClass}
