@@ -298,8 +298,9 @@ export async function updateExpense(expenseId: string, expenseData: {
   createdBy?: string;
   createdAt?: string;
   currency?: string;
+  category?: string;
 }) {
-  const { amount, description, splitPercentage, splitWith, createdBy, createdAt, currency } = expenseData;
+  const { amount, description, splitPercentage, splitWith, createdBy, createdAt, currency, category } = expenseData;
 
   try {
     const splitWithInfo = splitWith.map((member) => ({
@@ -320,7 +321,8 @@ export async function updateExpense(expenseId: string, expenseData: {
               split_with = ${JSON.stringify(splitWithInfo)},
               created_by = ${createdBy},
               created_at = ${dateValue},
-              currency = ${currency}
+              currency = ${currency},
+              category = COALESCE(${category || null}, category)
           WHERE id = ${expenseId}
         `;
       } else {
@@ -331,7 +333,8 @@ export async function updateExpense(expenseId: string, expenseData: {
               split_percentage = ${splitPercentage},
               split_with = ${JSON.stringify(splitWithInfo)},
               created_by = ${createdBy},
-              created_at = ${dateValue}
+              created_at = ${dateValue},
+              category = COALESCE(${category || null}, category)
           WHERE id = ${expenseId}
         `;
       }
@@ -344,7 +347,8 @@ export async function updateExpense(expenseId: string, expenseData: {
               split_percentage = ${splitPercentage},
               split_with = ${JSON.stringify(splitWithInfo)},
               created_by = ${createdBy},
-              currency = ${currency}
+              currency = ${currency},
+              category = COALESCE(${category || null}, category)
           WHERE id = ${expenseId}
         `;
       } else {
@@ -354,7 +358,8 @@ export async function updateExpense(expenseId: string, expenseData: {
               description = ${description},
               split_percentage = ${splitPercentage},
               split_with = ${JSON.stringify(splitWithInfo)},
-              created_by = ${createdBy}
+              created_by = ${createdBy},
+              category = COALESCE(${category || null}, category)
           WHERE id = ${expenseId}
         `;
       }
@@ -367,7 +372,8 @@ export async function updateExpense(expenseId: string, expenseData: {
               split_percentage = ${splitPercentage},
               split_with = ${JSON.stringify(splitWithInfo)},
               created_at = ${dateValue},
-              currency = ${currency}
+              currency = ${currency},
+              category = COALESCE(${category || null}, category)
           WHERE id = ${expenseId}
         `;
       } else {
@@ -377,7 +383,8 @@ export async function updateExpense(expenseId: string, expenseData: {
               description = ${description},
               split_percentage = ${splitPercentage},
               split_with = ${JSON.stringify(splitWithInfo)},
-              created_at = ${dateValue}
+              created_at = ${dateValue},
+              category = COALESCE(${category || null}, category)
           WHERE id = ${expenseId}
         `;
       }
@@ -389,7 +396,8 @@ export async function updateExpense(expenseId: string, expenseData: {
               description = ${description},
               split_percentage = ${splitPercentage},
               split_with = ${JSON.stringify(splitWithInfo)},
-              currency = ${currency}
+              currency = ${currency},
+              category = COALESCE(${category || null}, category)
           WHERE id = ${expenseId}
         `;
       } else {
@@ -398,7 +406,8 @@ export async function updateExpense(expenseId: string, expenseData: {
           SET amount = ${amount},
               description = ${description},
               split_percentage = ${splitPercentage},
-              split_with = ${JSON.stringify(splitWithInfo)}
+              split_with = ${JSON.stringify(splitWithInfo)},
+              category = COALESCE(${category || null}, category)
           WHERE id = ${expenseId}
         `;
       }
