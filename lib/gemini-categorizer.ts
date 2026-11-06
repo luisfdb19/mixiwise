@@ -2,7 +2,7 @@
 // Operates on the free tier with rate-limit friendly batching.
 // When GEMINI_API_KEY is unset, it cleanly skips without throwing errors.
 
-import { CATEGORY_LIST, sanitizeTransactionDescription } from './categories';
+import { CATEGORY_LIST } from './categories';
 
 const VALID_CATEGORY_IDS = new Set(CATEGORY_LIST.map((c) => c.id));
 
