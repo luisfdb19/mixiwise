@@ -415,7 +415,7 @@ export default function GroupReports({
       : 0;
 
     let peakMonth = monthsData[0];
-    let lowestMonth: typeof monthsData[0] | null = null;
+    let lowestMonth = null as (typeof monthsData)[number] | null;
 
     activeMonths.forEach((m) => {
       if (m.totalCents > peakMonth.totalCents) peakMonth = m;
@@ -621,11 +621,10 @@ export default function GroupReports({
             <button
               type="button"
               onClick={() => setExcludeSettlements((prev) => !prev)}
-              className={`text-xs font-bold gap-1.5 px-3 py-1.5 rounded-xl border flex items-center transition-all ${
-                excludeSettlements
+              className={`text-xs font-bold gap-1.5 px-3 py-1.5 rounded-xl border flex items-center transition-all ${excludeSettlements
                   ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
                   : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-              }`}
+                }`}
               title="Quando ativado, transferências de acerto entre membros não são somadas como compras do grupo"
             >
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: excludeSettlements ? '#6366F1' : '#9CA3AF' }} />
@@ -1243,9 +1242,8 @@ export default function GroupReports({
                     <div key={cat.id} className="border border-gray-100 rounded-xl overflow-hidden transition-all">
                       <div
                         onClick={() => setExpandedAnnualCategory(isExpanded ? null : cat.id)}
-                        className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${
-                          isExpanded ? 'bg-gray-50' : 'hover:bg-gray-50/80'
-                        }`}
+                        className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${isExpanded ? 'bg-gray-50' : 'hover:bg-gray-50/80'
+                          }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.info.color }} />
@@ -1368,11 +1366,10 @@ export default function GroupReports({
                 setSelectedCategoryFilter(null);
                 setFilterPayer(null);
               }}
-              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
-                !selectedCategoryFilter && !filterPayer
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${!selectedCategoryFilter && !filterPayer
                   ? 'bg-gray-900 text-white shadow-xs'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+                }`}
             >
               Todos ({periodExpenses.length})
             </button>
@@ -1386,11 +1383,10 @@ export default function GroupReports({
                 <button
                   type="button"
                   onClick={() => setSelectedCategoryFilter(isSelected ? null : 'outros')}
-                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${
-                    isSelected
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${isSelected
                       ? 'bg-amber-500 text-white shadow-xs'
                       : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                  }`}
+                    }`}
                 >
                   <span>🔶 Outros / Pendentes ({pendingCount})</span>
                 </button>
@@ -1406,11 +1402,10 @@ export default function GroupReports({
                 <button
                   type="button"
                   onClick={() => setSelectedCategoryFilter(isSelected ? null : 'acerto')}
-                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${
-                    isSelected
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${isSelected
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
-                  }`}
+                    }`}
                 >
                   <span>🤝 Acertos ({acertoCount})</span>
                 </button>
@@ -1426,11 +1421,10 @@ export default function GroupReports({
                 <button
                   type="button"
                   onClick={() => setSelectedCategoryFilter(isSelected ? null : 'investimentos')}
-                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${
-                    isSelected
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${isSelected
                       ? 'bg-amber-700 text-white shadow-xs'
                       : 'bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100'
-                  }`}
+                    }`}
                 >
                   <span>🔨 Investimentos ({invCount})</span>
                 </button>
@@ -1466,11 +1460,10 @@ export default function GroupReports({
                   key={p.id}
                   type="button"
                   onClick={() => setFilterPayer(isSelected ? null : p.id)}
-                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${
-                    isSelected
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${isSelected
                       ? 'bg-teal-600 text-white shadow-xs'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   <User size={11} />
                   <span>{p.name} ({p.count})</span>
@@ -1497,11 +1490,10 @@ export default function GroupReports({
                     setSortDirection('desc');
                   }
                 }}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${
-                  sortField === 'date'
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${sortField === 'date'
                     ? 'bg-white text-gray-900 shadow-xs'
                     : 'text-gray-500 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 Data
                 {sortField === 'date' && (
@@ -1519,11 +1511,10 @@ export default function GroupReports({
                     setSortDirection('desc');
                   }
                 }}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${
-                  sortField === 'amount'
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${sortField === 'amount'
                     ? 'bg-white text-gray-900 shadow-xs'
                     : 'text-gray-500 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 Valor
                 {sortField === 'amount' && (
@@ -1541,11 +1532,10 @@ export default function GroupReports({
                     setSortDirection('asc');
                   }
                 }}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${
-                  sortField === 'category'
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${sortField === 'category'
                     ? 'bg-white text-gray-900 shadow-xs'
                     : 'text-gray-500 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 Categoria
                 {sortField === 'category' && (
@@ -1563,11 +1553,10 @@ export default function GroupReports({
                     setSortDirection('asc');
                   }
                 }}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${
-                  sortField === 'payer'
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${sortField === 'payer'
                     ? 'bg-white text-gray-900 shadow-xs'
                     : 'text-gray-500 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 Pagador
                 {sortField === 'payer' && (
@@ -1587,9 +1576,8 @@ export default function GroupReports({
               return (
                 <Card
                   key={expense.id}
-                  className={`shadow-xs border-0 ring-1 ring-gray-200 rounded-xl bg-white transition-all ${
-                    isEditing ? 'relative z-50 overflow-visible ring-2 ring-teal-400' : 'relative z-0 overflow-visible'
-                  }`}
+                  className={`shadow-xs border-0 ring-1 ring-gray-200 rounded-xl bg-white transition-all ${isEditing ? 'relative z-50 overflow-visible ring-2 ring-teal-400' : 'relative z-0 overflow-visible'
+                    }`}
                 >
                   <CardContent className="flex items-center justify-between p-3 sm:p-4 overflow-visible">
                     <div className="flex items-center gap-3 min-w-0">
@@ -1646,11 +1634,10 @@ export default function GroupReports({
                                   key={c.id}
                                   type="button"
                                   onClick={() => handleQuickCategoryChange(expense.id, c.id)}
-                                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-50 flex items-center justify-between transition-colors ${
-                                    expense.category === c.id
+                                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-50 flex items-center justify-between transition-colors ${expense.category === c.id
                                       ? 'bg-teal-50 text-teal-700 font-bold'
                                       : 'text-gray-700'
-                                  }`}
+                                    }`}
                                 >
                                   <span className="flex items-center gap-2 min-w-0">
                                     <span
