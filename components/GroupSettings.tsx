@@ -128,7 +128,12 @@ export default function GroupSettings() {
       {/* Recurring Expenses Card */}
       <Card>
         <CardContent className="p-6">
-          <h3 className="text-lg font-semibold mb-4 text-gray-800">Despesas Recorrentes e Parceladas</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold text-gray-800">Despesas Recorrentes e Parceladas</h3>
+          </div>
+          <p className="text-xs text-gray-500 mb-4">
+            Regras de cobrança automática futura. Pausar ou excluir não afeta despesas já registradas no histórico.
+          </p>
           {recurringExpenses.length > 0 ? (
             <div className="divide-y divide-gray-100">
               {recurringExpenses.map((re) => {
@@ -168,11 +173,11 @@ export default function GroupSettings() {
                         size="icon"
                         className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50"
                         onClick={async () => {
-                          if (window.confirm('Tem certeza que deseja excluir esta recorrência? Nenhuma despesa futura será criada.')) {
+                          if (window.confirm('Excluir agendamento futuro?\n\nAs próximas cobranças automáticas serão canceladas. Todo o histórico de parcelas já lançadas continuará salvo no grupo.')) {
                             const res = await deleteRecurringExpense(re.id);
                             if (res.success) {
                               fetchRecurring();
-                              toast({ title: 'Excluído', description: 'Recorrência deletada com sucesso.' });
+                              toast({ title: 'Excluído', description: 'Recorrência futura cancelada com sucesso.' });
                             }
                           }
                         }}

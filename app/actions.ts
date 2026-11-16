@@ -557,6 +557,11 @@ export async function getRecurringExpenses(groupId: string) {
 
 export async function toggleRecurringExpenseStatus(id: string, active: boolean) {
   try {
+    const { userId } = auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
     await sql`
       UPDATE recurring_expenses
       SET active = ${active}
@@ -565,12 +570,17 @@ export async function toggleRecurringExpenseStatus(id: string, active: boolean) 
     return { success: true };
   } catch (error) {
     console.error('Error toggling recurring expense status:', error);
-    return { success: false };
+    return { success: false, error: 'Erro ao alterar status' };
   }
 }
 
 export async function deleteRecurringExpense(id: string) {
   try {
+    const { userId } = auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
     await sql`
       DELETE FROM recurring_expenses
       WHERE id = ${id}
@@ -578,7 +588,63 @@ export async function deleteRecurringExpense(id: string) {
     return { success: true };
   } catch (error) {
     console.error('Error deleting recurring expense:', error);
-    return { success: false };
+    return { success: false, error: 'Erro ao excluir regra' };
+  }
+}
+
+export async function updateRecurringExpense(
+  recurringExpenseId: string,
+  data: {
+    nextOccurrence?: string;
+    amount?: number;
+    description?: string;
+  }
+) {
+  try {
+    const { userId } = auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const rules = await sql`
+      SELECT id, group_id, amount, split_percentage, split_with, description, next_occurrence
+      FROM recurring_expenses
+      WHERE id = ${recurringExpenseId}
+    `;
+
+    if (rules.length === 0) {
+      return { success: false, error: 'Regra não encontrada' };
+    }
+
+    const currentRule = rules[0];
+    const newDescription = data.description !== undefined ? data.description.trim() : currentRule.description;
+    const newAmount = data.amount !== undefined ? Math.max(0, data.amount) : Number(currentRule.amount);
+    const newNextOccurrence = data.nextOccurrence
+      ? new Date(data.nextOccurrence)
+      : new Date(currentRule.next_occurrence);
+
+    let updatedSplitWith = currentRule.split_with;
+    if (Array.isArray(updatedSplitWith) && updatedSplitWith.length > 0) {
+      const splitAmount = (newAmount * (Number(currentRule.split_percentage) / 100)) / updatedSplitWith.length;
+      updatedSplitWith = updatedSplitWith.map((member: SplitMember) => ({
+        ...member,
+        splitAmount,
+      }));
+    }
+
+    await sql`
+      UPDATE recurring_expenses
+      SET description = ${newDescription},
+          amount = ${newAmount},
+          next_occurrence = ${newNextOccurrence},
+          split_with = ${JSON.stringify(updatedSplitWith)}::jsonb
+      WHERE id = ${recurringExpenseId}
+    `;
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating recurring expense:', error);
+    return { success: false, error: 'Erro ao atualizar regra' };
   }
 }
 
