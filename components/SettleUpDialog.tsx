@@ -76,7 +76,8 @@ export default function SettleUpDialog({ balances, groupId }: SettleUpDialogProp
       const expenseData = {
         amount: debt.amount,
         currency: debt.currency || 'BRL',
-        description: 'Pagamento',
+        description: 'Pagamento (Acerto)',
+        category: 'acerto',
         groupId: groupId,
         splitPercentage: 100,
         splitWith: [{

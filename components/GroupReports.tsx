@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useTransition } from 'react';
+import React, { useState, useMemo, useTransition, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +16,12 @@ import {
   Layers,
   Award,
   Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  User,
+  X,
+  ExternalLink,
 } from 'lucide-react';
 import { CATEGORY_LIST, getCategoryInfo } from '@/lib/categories';
 import { formatCurrency } from '@/lib/currency';
@@ -49,6 +55,8 @@ interface GroupReportsProps {
 
 type PeriodType = 'week' | 'month' | 'quarter' | 'year';
 type ReportTab = 'dashboard' | 'timeline' | 'abc' | 'deepdive';
+type SortField = 'date' | 'amount' | 'category' | 'payer';
+type SortDirection = 'asc' | 'desc';
 
 const MONTH_NAMES = [
   'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
@@ -72,8 +80,19 @@ export default function GroupReports({
   const [periodType, setPeriodType] = useState<PeriodType>('month');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
+  const [filterPayer, setFilterPayer] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [excludeSettlements, setExcludeSettlements] = useState<boolean>(true);
+  const [expandedAnnualCategory, setExpandedAnnualCategory] = useState<string | null>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const expensesSectionRef = useRef<HTMLDivElement>(null);
+
+  const scrollToExpenses = () => {
+    expensesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // Date boundaries calculation
   const { startDate, endDate, periodLabel, activeYear } = useMemo(() => {
@@ -83,7 +102,8 @@ export default function GroupReports({
     if (periodType === 'week') {
       const day = d.getDay();
       const diffToMonday = d.getDate() - day + (day === 0 ? -6 : 1);
-      const start = new Date(d.setDate(diffToMonday));
+      const start = new Date(selectedDate);
+      start.setDate(diffToMonday);
       start.setHours(0, 0, 0, 0);
 
       const end = new Date(start);
@@ -91,7 +111,7 @@ export default function GroupReports({
       end.setHours(23, 59, 59, 999);
 
       const label = `Semana de ${start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} a ${end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`;
-      return { startDate: start, endDate: end, periodLabel: label, activeYear: year };
+      return { startDate: start, endDate: end, periodLabel: label, activeYear: start.getFullYear() };
     }
 
     if (periodType === 'month') {
@@ -153,17 +173,58 @@ export default function GroupReports({
     });
   }, [expenses, activeYear]);
 
+  // Consumption expenses for reports (excluding settlements if toggled on)
+  const consumptionExpenses = useMemo(() => {
+    if (!excludeSettlements) return periodExpenses;
+    return periodExpenses.filter((e) => (e.category || 'outros').toLowerCase() !== 'acerto');
+  }, [periodExpenses, excludeSettlements]);
+
+  const fullYearConsumptionExpenses = useMemo(() => {
+    if (!excludeSettlements) return fullYearExpenses;
+    return fullYearExpenses.filter((e) => (e.category || 'outros').toLowerCase() !== 'acerto');
+  }, [fullYearExpenses, excludeSettlements]);
+
   // 1. Period Statistics using Integer Cents Arithmetic (GEMINI.md rule)
   const periodStats = useMemo(() => {
     let totalCents = 0;
+    let settlementsCents = 0;
+    let settlementsCount = 0;
+    let investmentsCents = 0;
+    let investmentsCount = 0;
+    let bigTripsCents = 0;
+    let routineCents = 0;
+    let consumptionCount = 0;
+
     const catCentsMap: Record<string, number> = {};
     const payerCentsMap: Record<string, { cents: number; name: string }> = {};
 
     periodExpenses.forEach((e) => {
       const cents = Math.round(e.amount * 100);
+      const cat = (e.category || 'outros').toLowerCase();
+      const isSettlement = cat === 'acerto';
+      const isInvestment = cat === 'investimentos';
+      const isBigTrip = cat === 'lazer' && /\b(passagem\s+(aerea|europa|internacional|latam|gol|azul)|pacote\s+viagem|voo)\b/i.test(e.description);
+
+      if (isSettlement) {
+        settlementsCents += cents;
+        settlementsCount += 1;
+      } else if (isInvestment) {
+        investmentsCents += cents;
+        investmentsCount += 1;
+      } else if (isBigTrip) {
+        bigTripsCents += cents;
+      } else {
+        routineCents += cents;
+      }
+
+      // If excluding settlements from consumption stats, skip adding to consumption total
+      if (excludeSettlements && isSettlement) {
+        return;
+      }
+
+      consumptionCount += 1;
       totalCents += cents;
 
-      const cat = (e.category || 'outros').toLowerCase();
       catCentsMap[cat] = (catCentsMap[cat] || 0) + cents;
 
       const pId = e.created_by;
@@ -200,17 +261,50 @@ export default function GroupReports({
       Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
     );
     const dailyAverage = totalCents > 0 ? totalCents / days / 100 : 0;
+    const routineDailyAverage = routineCents > 0 ? routineCents / days / 100 : 0;
+
+    // Projeção de Fechamento do Mês (Burn Rate da Rotina)
+    const now = new Date();
+    const isCurrentMonth =
+      periodType === 'month' &&
+      selectedDate.getMonth() === now.getMonth() &&
+      selectedDate.getFullYear() === now.getFullYear();
+
+    let projectedRoutineAmount: number | null = null;
+    let projectedTotalAmount: number | null = null;
+    let daysElapsed = days;
+
+    if (isCurrentMonth) {
+      const totalDaysInMonth = new Date(activeYear, selectedDate.getMonth() + 1, 0).getDate();
+      daysElapsed = Math.min(now.getDate(), totalDaysInMonth);
+      if (daysElapsed > 0) {
+        const projectedRoutineCents = Math.round((routineCents / daysElapsed) * totalDaysInMonth);
+        projectedRoutineAmount = projectedRoutineCents / 100;
+        projectedTotalAmount = (projectedRoutineCents + investmentsCents + bigTripsCents) / 100;
+      }
+    }
 
     return {
       totalAmount: totalCents / 100,
       totalCents,
-      count: periodExpenses.length,
+      count: consumptionCount,
       topCategory,
       dailyAverage,
+      routineDailyAverage,
       categoryBreakdown,
       payerBreakdown: Object.values(payerCentsMap).sort((a, b) => b.cents - a.cents),
+      isCurrentMonth,
+      projectedRoutineAmount,
+      projectedTotalAmount,
+      daysElapsed,
+      routineAmount: routineCents / 100,
+      investmentsAmount: investmentsCents / 100,
+      investmentsCount,
+      bigTripsAmount: bigTripsCents / 100,
+      settlementsCount,
+      settlementsAmount: settlementsCents / 100,
     };
-  }, [periodExpenses, startDate, endDate]);
+  }, [periodExpenses, startDate, endDate, excludeSettlements, periodType, selectedDate, activeYear]);
 
   // 2. Classificação ABC (Curva de Pareto 80/20) por Categoria
   const abcAnalysis = useMemo(() => {
@@ -290,7 +384,7 @@ export default function GroupReports({
 
     const catByMonthMap: Record<number, Record<string, number>> = {};
 
-    fullYearExpenses.forEach((e) => {
+    fullYearConsumptionExpenses.forEach((e) => {
       if (!e.created_at) return;
       const d = new Date(e.created_at);
       const m = d.getMonth();
@@ -344,14 +438,14 @@ export default function GroupReports({
       lowestMonth,
       maxMonthCents,
     };
-  }, [fullYearExpenses]);
+  }, [fullYearConsumptionExpenses]);
 
   // 4. Diagnóstico Anual Consolidado (Deep Dive Anual)
   const annualDeepDive = useMemo(() => {
     let yearTotalCents = 0;
     const catMap: Record<string, number> = {};
 
-    fullYearExpenses.forEach((e) => {
+    fullYearConsumptionExpenses.forEach((e) => {
       const cents = Math.round(e.amount * 100);
       yearTotalCents += cents;
       const cat = (e.category || 'outros').toLowerCase();
@@ -369,7 +463,7 @@ export default function GroupReports({
       .sort((a, b) => b.cents - a.cents);
 
     // Top 5 Largest single transactions of the year
-    const topExpenses = [...fullYearExpenses]
+    const topExpenses = [...fullYearConsumptionExpenses]
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5);
 
@@ -381,9 +475,9 @@ export default function GroupReports({
       sortedCats,
       topExpenses,
       top3Pct,
-      expenseCount: fullYearExpenses.length,
+      expenseCount: fullYearConsumptionExpenses.length,
     };
-  }, [fullYearExpenses]);
+  }, [fullYearConsumptionExpenses]);
 
   // Uncategorized expenses counter
   const uncategorizedCount = useMemo(() => {
@@ -423,22 +517,73 @@ export default function GroupReports({
     }
   };
 
-  // Filtered expenses list
+  // Unique payers in active period for quick filter chips
+  const uniquePayers = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    periodExpenses.forEach((e) => {
+      const existing = map.get(e.created_by);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(e.created_by, {
+          id: e.created_by,
+          name: e.created_by_name || 'Membro',
+          count: 1,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [periodExpenses]);
+
+  // Filtered & sorted expenses list
   const displayedExpenses = useMemo(() => {
     let list = periodExpenses;
+
     if (selectedCategoryFilter) {
       list = list.filter(
         (e) => (e.category || 'outros').toLowerCase() === selectedCategoryFilter.toLowerCase()
       );
     }
+
+    if (filterPayer) {
+      list = list.filter((e) => e.created_by === filterPayer);
+    }
+
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter(
         (e) => e.description.toLowerCase().includes(q) || (e.created_by_name || '').toLowerCase().includes(q)
       );
     }
-    return list;
-  }, [periodExpenses, selectedCategoryFilter, searchTerm]);
+
+    return [...list].sort((a, b) => {
+      const mult = sortDirection === 'asc' ? 1 : -1;
+
+      switch (sortField) {
+        case 'amount': {
+          const centsA = Math.round(a.amount * 100);
+          const centsB = Math.round(b.amount * 100);
+          return (centsA - centsB) * mult;
+        }
+        case 'category': {
+          const catA = (a.category || 'outros').toLowerCase();
+          const catB = (b.category || 'outros').toLowerCase();
+          return catA.localeCompare(catB) * mult;
+        }
+        case 'payer': {
+          const payerA = (a.created_by_name || '').toLowerCase();
+          const payerB = (b.created_by_name || '').toLowerCase();
+          return payerA.localeCompare(payerB) * mult;
+        }
+        case 'date':
+        default: {
+          const da = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const db = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return (da - db) * mult;
+        }
+      }
+    });
+  }, [periodExpenses, selectedCategoryFilter, filterPayer, searchTerm, sortField, sortDirection]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -477,23 +622,40 @@ export default function GroupReports({
             </button>
           </div>
 
-          {/* AI Auto-categorize Button */}
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={isPending}
-            onClick={handleBatchCategorize}
-            className="text-xs font-bold gap-1.5 text-purple-700 border-purple-200 hover:bg-purple-50 rounded-xl flex-shrink-0"
-          >
-            <Sparkles size={14} className={isPending ? 'animate-spin' : 'text-purple-600'} />
-            <span>
-              {isPending
-                ? 'Classificando...'
-                : uncategorizedCount > 0
-                  ? `Classificar pendentes (${uncategorizedCount})`
-                  : 'Reclassificar com IA'}
-            </span>
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Toggle de Acertos */}
+            <button
+              type="button"
+              onClick={() => setExcludeSettlements((prev) => !prev)}
+              className={`text-xs font-bold gap-1.5 px-3 py-1.5 rounded-xl border flex items-center transition-all ${
+                excludeSettlements
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                  : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+              }`}
+              title="Quando ativado, transferências de acerto entre membros não são somadas como compras do grupo"
+            >
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: excludeSettlements ? '#6366F1' : '#9CA3AF' }} />
+              <span>{excludeSettlements ? 'Ignorando acertos' : 'Somando acertos'}</span>
+            </button>
+
+            {/* AI Auto-categorize Button */}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isPending}
+              onClick={handleBatchCategorize}
+              className="text-xs font-bold gap-1.5 text-purple-700 border-purple-200 hover:bg-purple-50 rounded-xl flex-shrink-0"
+            >
+              <Sparkles size={14} className={isPending ? 'animate-spin' : 'text-purple-600'} />
+              <span>
+                {isPending
+                  ? 'Classificando...'
+                  : uncategorizedCount > 0
+                    ? `Classificar pendentes (${uncategorizedCount})`
+                    : 'Reclassificar com IA'}
+              </span>
+            </Button>
+          </div>
         </div>
 
         {/* Period Selector (Only shown for period-dependent tabs) */}
@@ -556,21 +718,75 @@ export default function GroupReports({
         <div className="space-y-6">
           {/* Top 3 KPI Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <Card className="border-0 ring-1 ring-gray-200 shadow-sm rounded-2xl bg-gradient-to-br from-white to-gray-50/50">
+            <Card
+              onClick={() => {
+                setSelectedCategoryFilter(null);
+                setFilterPayer(null);
+                scrollToExpenses();
+              }}
+              className="border-0 ring-1 ring-gray-200 shadow-sm rounded-2xl bg-gradient-to-br from-white to-gray-50/50 cursor-pointer hover:ring-2 hover:ring-teal-400 hover:shadow-md transition-all group"
+            >
               <CardContent className="p-4 sm:p-5">
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total do Período</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total do Período</p>
+                  <span className="text-[10px] font-bold text-teal-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Ver despesas ↓
+                  </span>
+                </div>
                 <p className="text-2xl font-black text-gray-900 mt-1">
                   {formatCurrency(periodStats.totalAmount)}
                 </p>
-                <p className="text-[11px] text-gray-500 font-medium mt-1">
-                  Média de {formatCurrency(periodStats.dailyAverage)} / dia
-                </p>
+                <div className="flex items-center justify-between text-[11px] text-gray-500 font-medium mt-1 flex-wrap gap-1">
+                  <span>Média rotina: {formatCurrency(periodStats.routineDailyAverage)} / dia</span>
+                  {periodStats.isCurrentMonth && periodStats.projectedRoutineAmount && (
+                    <span className="font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-md">
+                      Rotina projetada: {formatCurrency(periodStats.projectedRoutineAmount)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Destaque de Investimentos e Viagens Pontuais se houver */}
+                {(periodStats.investmentsAmount > 0 || periodStats.bigTripsAmount > 0) && (
+                  <div className="text-[10px] text-amber-800 font-medium mt-1.5 pt-1 border-t border-gray-100 flex flex-wrap gap-1.5">
+                    {periodStats.investmentsAmount > 0 && (
+                      <span className="bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        🔨 {formatCurrency(periodStats.investmentsAmount)} em reformas/bens
+                      </span>
+                    )}
+                    {periodStats.bigTripsAmount > 0 && (
+                      <span className="bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 text-purple-700">
+                        ✈️ {formatCurrency(periodStats.bigTripsAmount)} em viagens
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {excludeSettlements && periodStats.settlementsCount > 0 && (
+                  <p className="text-[10px] text-indigo-600 font-semibold mt-1">
+                    🤝 {periodStats.settlementsCount} acerto(s) desconsiderados ({formatCurrency(periodStats.settlementsAmount)})
+                  </p>
+                )}
               </CardContent>
             </Card>
 
-            <Card className="border-0 ring-1 ring-gray-200 shadow-sm rounded-2xl bg-gradient-to-br from-white to-gray-50/50">
+            <Card
+              onClick={() => {
+                if (periodStats.topCategory) {
+                  setSelectedCategoryFilter(periodStats.topCategory.id);
+                  scrollToExpenses();
+                }
+              }}
+              className="border-0 ring-1 ring-gray-200 shadow-sm rounded-2xl bg-gradient-to-br from-white to-gray-50/50 cursor-pointer hover:ring-2 hover:ring-teal-400 hover:shadow-md transition-all group"
+            >
               <CardContent className="p-4 sm:p-5">
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Maior Centro de Custo</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Maior Centro de Custo</p>
+                  {periodStats.topCategory && (
+                    <span className="text-[10px] font-bold text-teal-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                      Filtrar ↓
+                    </span>
+                  )}
+                </div>
                 {periodStats.topCategory ? (
                   <>
                     <p className="text-xl font-black text-gray-900 mt-1 truncate">
@@ -591,9 +807,17 @@ export default function GroupReports({
               </CardContent>
             </Card>
 
-            <Card className="border-0 ring-1 ring-gray-200 shadow-sm rounded-2xl bg-gradient-to-br from-white to-gray-50/50">
+            <Card
+              onClick={() => scrollToExpenses()}
+              className="border-0 ring-1 ring-gray-200 shadow-sm rounded-2xl bg-gradient-to-br from-white to-gray-50/50 cursor-pointer hover:ring-2 hover:ring-teal-400 hover:shadow-md transition-all group"
+            >
               <CardContent className="p-4 sm:p-5">
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Membros Pagadores</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Membros Pagadores</p>
+                  <span className="text-[10px] font-bold text-teal-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Detalhar ↓
+                  </span>
+                </div>
                 <p className="text-2xl font-black text-gray-900 mt-1">
                   {periodStats.payerBreakdown.length}
                 </p>
@@ -629,7 +853,13 @@ export default function GroupReports({
                     return (
                       <div
                         key={cat.id}
-                        onClick={() => setSelectedCategoryFilter(isSelected ? null : cat.id)}
+                        onClick={() => {
+                          const next = isSelected ? null : cat.id;
+                          setSelectedCategoryFilter(next);
+                          if (next) {
+                            setTimeout(() => scrollToExpenses(), 120);
+                          }
+                        }}
                         className={`p-2.5 rounded-xl transition-all cursor-pointer border ${isSelected
                           ? 'border-teal-400 bg-teal-50/30 ring-1 ring-teal-300'
                           : 'border-transparent hover:bg-gray-50'
@@ -722,6 +952,7 @@ export default function GroupReports({
                           setSelectedDate(new Date(activeYear, m.monthIndex, 1));
                           setPeriodType('month');
                           setReportTab('dashboard');
+                          setTimeout(() => scrollToExpenses(), 120);
                         }}
                       >
                         {/* Hover Tooltip */}
@@ -767,8 +998,8 @@ export default function GroupReports({
                   </div>
                   <div className="bg-gray-50 rounded-xl p-2.5">
                     <p className="text-[10px] text-gray-400 font-bold uppercase">Mês mais econômico</p>
-                    <p className="font-bold text-gray-800">{(monthlyTimeline.lowestMonth as unknown as { fullName?: string, totalCents?: number })?.fullName || '--'}</p>
-                    <p className="font-extrabold text-gray-700">{formatCurrency(((monthlyTimeline.lowestMonth as unknown as { fullName?: string, totalCents?: number })?.totalCents || 0) / 100)}</p>
+                    <p className="font-bold text-gray-800">{monthlyTimeline.lowestMonth?.fullName || '--'}</p>
+                    <p className="font-extrabold text-gray-700">{formatCurrency((monthlyTimeline.lowestMonth?.totalCents || 0) / 100)}</p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-2.5">
                     <p className="text-[10px] text-gray-400 font-bold uppercase">Média mensal</p>
@@ -855,7 +1086,16 @@ export default function GroupReports({
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {abcAnalysis.classifiedCategories.map((c) => (
-                      <tr key={c.id} className="hover:bg-gray-50/80 transition-colors">
+                      <tr
+                        key={c.id}
+                        onClick={() => {
+                          setSelectedCategoryFilter(c.id);
+                          setReportTab('dashboard');
+                          setTimeout(() => scrollToExpenses(), 120);
+                        }}
+                        className="hover:bg-teal-50/60 transition-colors cursor-pointer group"
+                        title={`Clique para detalhar despesas de ${c.name}`}
+                      >
                         <td className="py-3 px-3">
                           <span
                             className={`px-2 py-0.5 rounded font-black text-[11px] ${c.abcClass === 'A'
@@ -868,9 +1108,14 @@ export default function GroupReports({
                             Classe {c.abcClass}
                           </span>
                         </td>
-                        <td className="py-3 px-3 font-bold text-gray-800 flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }} />
-                          {c.name}
+                        <td className="py-3 px-3 font-bold text-gray-800 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }} />
+                            <span>{c.name}</span>
+                          </div>
+                          <span className="text-[10px] text-teal-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                            Ver despesas →
+                          </span>
                         </td>
                         <td className="py-3 px-3 text-right font-black text-gray-900">
                           {formatCurrency(c.amount)}
@@ -927,10 +1172,13 @@ export default function GroupReports({
           {/* Top 5 Single Expenses of the Year */}
           <Card className="border-0 ring-1 ring-gray-200 shadow-sm rounded-2xl bg-white overflow-hidden">
             <CardContent className="p-4 sm:p-6 space-y-3">
-              <h4 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                <TrendingDown size={18} className="text-red-500" />
-                Top 5 Maiores Despesas Individuais de {activeYear}
-              </h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
+                  <TrendingDown size={18} className="text-red-500" />
+                  Top 5 Maiores Despesas Individuais de {activeYear}
+                </h4>
+                <span className="text-[10px] text-gray-400 font-medium">Clique para ir ao mês</span>
+              </div>
 
               <div className="space-y-2">
                 {annualDeepDive.topExpenses.map((exp, idx) => {
@@ -938,14 +1186,26 @@ export default function GroupReports({
                   return (
                     <div
                       key={exp.id}
-                      className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors"
+                      onClick={() => {
+                        if (exp.created_at) {
+                          setSelectedDate(new Date(exp.created_at));
+                          setPeriodType('month');
+                          setReportTab('dashboard');
+                          setSearchTerm(exp.description);
+                          setTimeout(() => scrollToExpenses(), 150);
+                        }
+                      }}
+                      className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-teal-50/50 hover:border-teal-200 transition-all cursor-pointer group"
+                      title="Clique para ir ao mês desta despesa"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-6 h-6 rounded-full bg-gray-900 text-white font-black text-xs flex items-center justify-center flex-shrink-0">
+                        <span className="w-6 h-6 rounded-full bg-gray-900 text-white font-black text-xs flex items-center justify-center flex-shrink-0 group-hover:bg-teal-600 transition-colors">
                           {idx + 1}
                         </span>
                         <div className="min-w-0">
-                          <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">{exp.description}</p>
+                          <p className="text-xs sm:text-sm font-bold text-gray-900 truncate group-hover:text-teal-700 transition-colors">
+                            {exp.description}
+                          </p>
                           <p className="text-[10px] text-gray-400">
                             {exp.created_at ? new Date(exp.created_at).toLocaleDateString('pt-BR') : '--'} • Pago por {exp.created_by_name || 'Membro'}
                           </p>
@@ -966,28 +1226,360 @@ export default function GroupReports({
               </div>
             </CardContent>
           </Card>
+
+          {/* Categorias do Ano com Detalhamento Expansível */}
+          <Card className="border-0 ring-1 ring-gray-200 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <CardContent className="p-4 sm:p-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
+                  <PieChart size={18} className="text-teal-600" />
+                  Detalhamento de Custos por Categoria em {activeYear}
+                </h4>
+                <span className="text-[10px] text-gray-400 font-medium">Toque para expandir maiores itens</span>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                {annualDeepDive.sortedCats.map((cat) => {
+                  const isExpanded = expandedAnnualCategory === cat.id;
+                  const catExpenses = fullYearExpenses
+                    .filter((e) => (e.category || 'outros').toLowerCase() === cat.id)
+                    .sort((a, b) => Math.round(b.amount * 100) - Math.round(a.amount * 100));
+
+                  return (
+                    <div key={cat.id} className="border border-gray-100 rounded-xl overflow-hidden transition-all">
+                      <div
+                        onClick={() => setExpandedAnnualCategory(isExpanded ? null : cat.id)}
+                        className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${
+                          isExpanded ? 'bg-gray-50' : 'hover:bg-gray-50/80'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.info.color }} />
+                          <span className="font-bold text-xs sm:text-sm text-gray-900 truncate">{cat.info.name}</span>
+                          <span className="text-[10px] font-semibold text-gray-400">({catExpenses.length} itens)</span>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 flex-shrink-0">
+                          <span className="text-xs font-semibold text-gray-500">{cat.pct.toFixed(1)}%</span>
+                          <span className="text-xs sm:text-sm font-black text-gray-900">{formatCurrency(cat.amount)}</span>
+                          <ChevronRight
+                            size={16}
+                            className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                          />
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="p-3 bg-gray-50/50 border-t border-gray-100 space-y-2">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1">
+                            <span>Maiores despesas do ano nesta categoria</span>
+                            <button
+                              onClick={() => {
+                                setPeriodType('year');
+                                setSelectedCategoryFilter(cat.id);
+                                setReportTab('dashboard');
+                                setTimeout(() => scrollToExpenses(), 150);
+                              }}
+                              className="text-teal-600 hover:underline lowercase font-semibold flex items-center gap-1"
+                            >
+                              Ver todas no ano <ExternalLink size={11} />
+                            </button>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            {catExpenses.slice(0, 8).map((item) => (
+                              <div
+                                key={item.id}
+                                onClick={() => {
+                                  if (item.created_at) {
+                                    setSelectedDate(new Date(item.created_at));
+                                    setPeriodType('month');
+                                    setReportTab('dashboard');
+                                    setSearchTerm(item.description);
+                                    setTimeout(() => scrollToExpenses(), 150);
+                                  }
+                                }}
+                                className="flex items-center justify-between p-2 rounded-lg bg-white border border-gray-100 hover:border-teal-200 hover:bg-teal-50/30 cursor-pointer text-xs transition-colors"
+                              >
+                                <div className="min-w-0 pr-2">
+                                  <p className="font-semibold text-gray-800 truncate">{item.description}</p>
+                                  <p className="text-[10px] text-gray-400">
+                                    {item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : '--'} • {item.created_by_name || 'Membro'}
+                                  </p>
+                                </div>
+                                <span className="font-bold text-gray-900 flex-shrink-0">
+                                  {formatCurrency(item.amount, item.currency || 'BRL')}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* ==================== EXPENSES TABLE (SEARCH & INTERACTION) ==================== */}
-      <div className="space-y-3 pt-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <h3 className="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2">
-            <Filter size={15} className="text-gray-400" />
-            Lançamentos do Período ({displayedExpenses.length})
-          </h3>
+      <div ref={expensesSectionRef} className="space-y-3 pt-3 border-t border-gray-100">
+        <div className="flex flex-col gap-3">
+          {/* Header row: Title + Clean Filters + Search */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2">
+                <Filter size={15} className="text-gray-400" />
+                Lançamentos do Período ({displayedExpenses.length}
+                {displayedExpenses.length !== periodExpenses.length ? ` de ${periodExpenses.length}` : ''})
+              </h3>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+              {(selectedCategoryFilter || filterPayer || searchTerm.trim()) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategoryFilter(null);
+                    setFilterPayer(null);
+                    setSearchTerm('');
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-full transition-colors"
+                >
+                  <X size={12} />
+                  Limpar filtros
+                </button>
+              )}
+            </div>
+
             {/* Search Input */}
-            <div className="relative flex-grow sm:w-60">
+            <div className="relative w-full sm:w-64">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Buscar despesa..."
+                placeholder="Buscar por descrição ou pagador..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-teal-500 shadow-2xs"
               />
+            </div>
+          </div>
+
+          {/* Quick Filter Chips (All, Pending/Outros, Specific Category, Payers) */}
+          <div className="flex items-center gap-1.5 flex-wrap text-xs">
+            {/* All */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategoryFilter(null);
+                setFilterPayer(null);
+              }}
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                !selectedCategoryFilter && !filterPayer
+                  ? 'bg-gray-900 text-white shadow-xs'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Todos ({periodExpenses.length})
+            </button>
+
+            {/* Pendentes / Outros */}
+            {(() => {
+              const pendingCount = periodExpenses.filter((e) => !e.category || e.category === 'outros').length;
+              if (pendingCount === 0 && selectedCategoryFilter !== 'outros') return null;
+              const isSelected = selectedCategoryFilter === 'outros';
+              return (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryFilter(isSelected ? null : 'outros')}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${
+                    isSelected
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                  }`}
+                >
+                  <span>🔶 Outros / Pendentes ({pendingCount})</span>
+                </button>
+              );
+            })()}
+
+            {/* Acertos / Fechamentos */}
+            {(() => {
+              const acertoCount = periodExpenses.filter((e) => (e.category || '').toLowerCase() === 'acerto').length;
+              if (acertoCount === 0 && selectedCategoryFilter !== 'acerto') return null;
+              const isSelected = selectedCategoryFilter === 'acerto';
+              return (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryFilter(isSelected ? null : 'acerto')}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+                  }`}
+                >
+                  <span>🤝 Acertos ({acertoCount})</span>
+                </button>
+              );
+            })()}
+
+            {/* Investimentos & Bens */}
+            {(() => {
+              const invCount = periodExpenses.filter((e) => (e.category || '').toLowerCase() === 'investimentos').length;
+              if (invCount === 0 && selectedCategoryFilter !== 'investimentos') return null;
+              const isSelected = selectedCategoryFilter === 'investimentos';
+              return (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryFilter(isSelected ? null : 'investimentos')}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${
+                    isSelected
+                      ? 'bg-amber-700 text-white shadow-xs'
+                      : 'bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100'
+                  }`}
+                >
+                  <span>🔨 Investimentos ({invCount})</span>
+                </button>
+              );
+            })()}
+
+            {/* Active Specific Category Chip if not 'outros' */}
+            {selectedCategoryFilter && selectedCategoryFilter !== 'outros' && (() => {
+              const info = getCategoryInfo(selectedCategoryFilter);
+              return (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryFilter(null)}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1.5 ${info.bgLight} ${info.textColor} border ${info.borderColor}`}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: info.color }} />
+                  <span>{info.name}</span>
+                  <X size={12} />
+                </button>
+              );
+            })()}
+
+            {/* Divider */}
+            {uniquePayers.length > 1 && (
+              <span className="text-gray-300 mx-0.5">|</span>
+            )}
+
+            {/* Payer Filter Chips */}
+            {uniquePayers.map((p) => {
+              const isSelected = filterPayer === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setFilterPayer(isSelected ? null : p.id)}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all ${
+                    isSelected
+                      ? 'bg-teal-600 text-white shadow-xs'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <User size={11} />
+                  <span>{p.name} ({p.count})</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sort Controls Bar */}
+          <div className="flex items-center justify-between gap-2 pt-1 pb-1 border-t border-gray-100 flex-wrap">
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+              <ArrowUpDown size={12} />
+              Ordenar por:
+            </span>
+
+            <div className="inline-flex bg-gray-100 p-0.5 rounded-lg text-xs font-semibold text-gray-600 flex-wrap gap-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (sortField === 'date') {
+                    setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortField('date');
+                    setSortDirection('desc');
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${
+                  sortField === 'date'
+                    ? 'bg-white text-gray-900 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                Data
+                {sortField === 'date' && (
+                  sortDirection === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (sortField === 'amount') {
+                    setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortField('amount');
+                    setSortDirection('desc');
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${
+                  sortField === 'amount'
+                    ? 'bg-white text-gray-900 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                Valor
+                {sortField === 'amount' && (
+                  sortDirection === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (sortField === 'category') {
+                    setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortField('category');
+                    setSortDirection('asc');
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${
+                  sortField === 'category'
+                    ? 'bg-white text-gray-900 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                Categoria
+                {sortField === 'category' && (
+                  sortDirection === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (sortField === 'payer') {
+                    setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortField('payer');
+                    setSortDirection('asc');
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${
+                  sortField === 'payer'
+                    ? 'bg-white text-gray-900 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                Pagador
+                {sortField === 'payer' && (
+                  sortDirection === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />
+                )}
+              </button>
             </div>
           </div>
         </div>

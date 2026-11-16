@@ -102,6 +102,33 @@ export const CATEGORIES: Record<string, CategoryInfo> = {
     textColor: 'text-rose-700',
     borderColor: 'border-rose-200',
   },
+  cuidados: {
+    id: 'cuidados',
+    name: 'Cuidados & Bem-Estar',
+    icon: 'Sparkles',
+    color: '#0EA5E9',
+    bgLight: 'bg-sky-50',
+    textColor: 'text-sky-700',
+    borderColor: 'border-sky-200',
+  },
+  investimentos: {
+    id: 'investimentos',
+    name: 'Investimentos & Bens',
+    icon: 'Hammer',
+    color: '#D97706',
+    bgLight: 'bg-amber-50',
+    textColor: 'text-amber-800',
+    borderColor: 'border-amber-300',
+  },
+  acerto: {
+    id: 'acerto',
+    name: 'Acerto & Fechamento',
+    icon: 'ArrowLeftRight',
+    color: '#6366F1',
+    bgLight: 'bg-indigo-50',
+    textColor: 'text-indigo-700',
+    borderColor: 'border-indigo-200',
+  },
   outros: {
     id: 'outros',
     name: 'Outros',
@@ -183,7 +210,7 @@ const TOKEN_RULES: { categoryId: string; regex: RegExp; weight: number }[] = [
   {
     categoryId: 'transporte',
     weight: 0.95,
-    regex: /\b(uber|99\b|99pop|taxi|gasolina|etanol|diesel|combustivel|posto shell|posto ipiranga|posto br|ipiranga|petrobras|pedagio|sem parar|conectcar|veloe|taggy|estacionamento|valet|zona azul|metro|bilhete unico|top transporte|onibus|passagem rodoviaria|revisao carro|mecanico|troca de oleo|pneu|borracharia)\b/i,
+    regex: /\b(uber|99\b|99pop|taxi|gasolina|etanol|diesel|combustivel|posto shell|posto ipiranga|posto br|ipiranga|petrobras|pedagio|sem parar|conectcar|veloe|taggy|estacionamento|valet|zona azul|metro|bilhete unico|top transporte|onibus|passagem rodoviaria|revisao carro|mecanico|troca de oleo|pneu|borracharia|eletroposto|recarga|tupinamba|ezvolt|zletric|shell recharge|volvo recharge|carregador eletrico|carro eletrico)\b/i,
   },
   {
     categoryId: 'lazer',
@@ -203,7 +230,12 @@ const TOKEN_RULES: { categoryId: string; regex: RegExp; weight: number }[] = [
   {
     categoryId: 'casa',
     weight: 0.90,
-    regex: /\b(faxina|diarista|limpeza|produtos de limpeza|reforma|material de construcao|leroy merlin|leroy|c&c|telhanorte|eletricista|encanador|chaveiro|pintor|marceneiro|conserto|reparo|lampada|utensilios|tok&stok|camicado|etna|mobly|cassol|ahoy)\b/i,
+    regex: /\b(faxina|diarista|limpeza|produtos de limpeza|eletricista|encanador|chaveiro|pintor|marceneiro|conserto|reparo|lampada|utensilios|tok&stok|camicado|etna|mobly|cassol|ahoy)\b/i,
+  },
+  {
+    categoryId: 'investimentos',
+    weight: 0.95,
+    regex: /\b(reforma|pedreiro|obra\b|banheiro|porcelanato|cimento|tinta|pintura casa|colchao|cama box|cama|sofa|geladeira|fogao|lava louca|maquina lavar|moveis planejados|planejados|marcenaria|armario planejado|ar condicionado|entrada carro|compra carro|material construcao|material de construcao|leroy merlin|leroy|c&c|telhanorte)\b/i,
   },
   {
     categoryId: 'pets',
@@ -214,6 +246,16 @@ const TOKEN_RULES: { categoryId: string; regex: RegExp; weight: number }[] = [
     categoryId: 'compras',
     weight: 0.90,
     regex: /\b(shopee|temu|aliexpress|shein|mercado livre|mercadolivre|presente|lembrancinha|brinquedo|bebe|cha de bebe|aniversario|papelaria|livro|livraria|zara|renner|c&a|riachuelo|calcado|vestuario|roupa|estofados|capa|decoracao|sala temu)\b/i,
+  },
+  {
+    categoryId: 'cuidados',
+    weight: 0.95,
+    regex: /\b(salao|barbearia|barbeiro|cabelo|cabeleireiro|manicure|pedicure|depilacao|estetica|skincare|cosmetico|cosmeticos|perfume|perfumaria|maquiagem|boticario|natura|sephora|creme|hidratante|corte\s+cabelo|sobrancelha|massagem|esmaltaria)\b/i,
+  },
+  {
+    categoryId: 'acerto',
+    weight: 0.98,
+    regex: /\b(acerto|fechamento|reembolso|reembolsado|pagou|devolucao|quitacao|settle\s*up|acerto\s+contas|acerto\s+divida|pagamento\s+acerto|saldo\s+acerto|pix\s+(fechamento|acerto|repasse|devolucao)|repasse)\b/i,
   },
 ];
 
@@ -236,6 +278,17 @@ export function classifyExpense(
 ): ClassificationResult {
   if (!rawDescription || !rawDescription.trim()) {
     return { categoryId: DEFAULT_CATEGORY, confidence: 0, source: 'fallback', needsReview: true };
+  }
+
+  // Pre-check for explicit settlements (ex: "Pagamento", "Acerto", "Fechamento", "Settle Up")
+  const rawLower = rawDescription.toLowerCase().trim();
+  if (/^(pagamento|acerto|fechamento|settle\s*up|reembolso|devolucao)$/i.test(rawLower) || /\b(acerto|fechamento|reembolso|pagou|devolucao)\b/i.test(rawLower)) {
+    return {
+      categoryId: 'acerto',
+      confidence: 0.99,
+      source: 'rules',
+      needsReview: false,
+    };
   }
 
   const clean = sanitizeTransactionDescription(rawDescription);
