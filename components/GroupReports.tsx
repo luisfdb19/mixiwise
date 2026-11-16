@@ -173,12 +173,6 @@ export default function GroupReports({
     });
   }, [expenses, activeYear]);
 
-  // Consumption expenses for reports (excluding settlements if toggled on)
-  const consumptionExpenses = useMemo(() => {
-    if (!excludeSettlements) return periodExpenses;
-    return periodExpenses.filter((e) => (e.category || 'outros').toLowerCase() !== 'acerto');
-  }, [periodExpenses, excludeSettlements]);
-
   const fullYearConsumptionExpenses = useMemo(() => {
     if (!excludeSettlements) return fullYearExpenses;
     return fullYearExpenses.filter((e) => (e.category || 'outros').toLowerCase() !== 'acerto');
