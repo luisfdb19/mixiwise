@@ -1001,9 +1001,11 @@ export default function GroupReports({
               return (
                 <Card
                   key={expense.id}
-                  className="shadow-xs border-0 ring-1 ring-gray-200 rounded-xl overflow-hidden bg-white"
+                  className={`shadow-xs border-0 ring-1 ring-gray-200 rounded-xl bg-white transition-all ${
+                    isEditing ? 'relative z-50 overflow-visible ring-2 ring-teal-400' : 'relative z-0 overflow-visible'
+                  }`}
                 >
-                  <CardContent className="flex items-center justify-between p-3 sm:p-4">
+                  <CardContent className="flex items-center justify-between p-3 sm:p-4 overflow-visible">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="flex flex-col items-center justify-center w-9 sm:w-11 text-center flex-shrink-0">
                         <span className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase leading-none">
@@ -1041,19 +1043,43 @@ export default function GroupReports({
                         </button>
 
                         {isEditing && (
-                          <div className="absolute right-0 top-7 mt-1 bg-white border border-gray-200 shadow-xl rounded-xl p-1 z-30 w-52 grid grid-cols-1 gap-0.5 max-h-48 overflow-y-auto">
-                            <p className="text-[9px] font-bold text-gray-400 px-2 py-1 uppercase">Trocar categoria:</p>
-                            {CATEGORY_LIST.map((c) => (
-                              <button
-                                key={c.id}
-                                onClick={() => handleQuickCategoryChange(expense.id, c.id)}
-                                className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                              >
-                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
-                                <span className="truncate">{c.name}</span>
-                              </button>
-                            ))}
-                          </div>
+                          <>
+                            {/* Backdrop click-to-close */}
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setEditingExpenseId(null)}
+                            />
+
+                            {/* Dropdown Menu */}
+                            <div className="absolute right-0 top-full mt-1.5 bg-white border border-gray-200 shadow-2xl rounded-xl p-1.5 z-50 w-56 grid grid-cols-1 gap-1 max-h-60 overflow-y-auto">
+                              <p className="text-[10px] font-bold text-gray-400 px-2 py-1 uppercase tracking-wider">
+                                Trocar categoria:
+                              </p>
+                              {CATEGORY_LIST.map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => handleQuickCategoryChange(expense.id, c.id)}
+                                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-50 flex items-center justify-between transition-colors ${
+                                    expense.category === c.id
+                                      ? 'bg-teal-50 text-teal-700 font-bold'
+                                      : 'text-gray-700'
+                                  }`}
+                                >
+                                  <span className="flex items-center gap-2 min-w-0">
+                                    <span
+                                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: c.color }}
+                                    />
+                                    <span className="truncate">{c.name}</span>
+                                  </span>
+                                  {expense.category === c.id && (
+                                    <span className="text-teal-600 font-bold text-xs">✓</span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </>
                         )}
                       </div>
 

@@ -84,6 +84,24 @@ export const CATEGORIES: Record<string, CategoryInfo> = {
     textColor: 'text-gray-700',
     borderColor: 'border-gray-200',
   },
+  pets: {
+    id: 'pets',
+    name: 'Pets & Animais',
+    icon: 'Dog',
+    color: '#EC4899',
+    bgLight: 'bg-pink-50',
+    textColor: 'text-pink-700',
+    borderColor: 'border-pink-200',
+  },
+  compras: {
+    id: 'compras',
+    name: 'Compras & Presentes',
+    icon: 'Gift',
+    color: '#F43F5E',
+    bgLight: 'bg-rose-50',
+    textColor: 'text-rose-700',
+    borderColor: 'border-rose-200',
+  },
   outros: {
     id: 'outros',
     name: 'Outros',
@@ -150,17 +168,17 @@ const TOKEN_RULES: { categoryId: string; regex: RegExp; weight: number }[] = [
   {
     categoryId: 'mercado',
     weight: 0.95,
-    regex: /\b(mercado|supermercado|hipermercado|carrefour|pao de acucar|extra|feira|acougue|hortifruti|sacolao|atacadao|assai|sams club|compras|padaria|mercearia|quitanda|horta|zaffari|muffato|bistek|condor|dia|super|varejo alimenticio|mercearia)\b/i,
+    regex: /\b(mercado|supermercado|hipermercado|carrefour|pao de acucar|extra|feira|acougue|hortifruti|sacolao|atacadao|assai|sams club|compras|padaria|mercearia|quitanda|horta|zaffari|muffato|bistek|condor|dia|super|varejo alimenticio|direto do campo|direto campo|angeloni|ubaia|granel|banana|fruta|salgado congelado|padeiro|acougue|carne)\b/i,
   },
   {
     categoryId: 'restaurante',
     weight: 0.95,
-    regex: /\b(ifood|rappi|restaurante|pizzaria|pizza|hamburguer|burger|boteco|choperia|chopp|cerveja|cervejaria|starbucks|mcdonalds|mc donalds|burger king|bk|subway|habibs|madero|outback|giraffas|bobs|coco bambu|churrasco|churrascaria|sushi|temaki|temakeria|acai|sorveteria|gelato|almoco|jantar|lanche|refeicao|bar\b|lanchonete|bistro|cafeteria|cafe\b)\b/i,
+    regex: /\b(ifood|clube ifood|rappi|restaurante|pizzaria|pizza|hamburguer|burger|boteco|choperia|chopp|cerveja|cervejaria|starbucks|mcdonalds|mc donalds|burger king|bk|subway|habibs|madero|outback|giraffas|bobs|coco bambu|churrasco|churrascaria|sushi|temaki|temakeria|acai|sorveteria|sorvete|gelato|almoco|jantar|lanche|refeicao|bar\b|lanchonete|bistro|cafeteria|cafe\b|moochacho|larikas|pao a mao|sushishop|servidores|burrito)\b/i,
   },
   {
     categoryId: 'moradia',
     weight: 0.95,
-    regex: /\b(aluguel|condominio|enel|cpfl|cemig|copel|eletropaulo|sabesp|saneago|sanepar|copasa|embasa|caesb|cedae|gas\b|ultragaz|supergasbras|liquigas|nacional gas|internet|claro|vivo|tim|oi|fibra|iptu|energia eletrica|taxa condominial|seguro residencial)\b/i,
+    regex: /\b(aluguel|condominio|cond\b|enel|cpfl|cemig|copel|eletropaulo|sabesp|saneago|sanepar|copasa|embasa|caesb|cedae|gas\b|agua\b|ultragaz|supergasbras|liquigas|nacional gas|internet|claro|vivo|tim|oi|fibra|iptu|energia eletrica|taxa condominial|seguro residencial)\b/i,
   },
   {
     categoryId: 'transporte',
@@ -170,7 +188,7 @@ const TOKEN_RULES: { categoryId: string; regex: RegExp; weight: number }[] = [
   {
     categoryId: 'lazer',
     weight: 0.90,
-    regex: /\b(viagem|airbnb|booking|hotel|pousada|resort|hostel|cinema|cinemark|cinepolis|ingresso|sympla|eventim|show|teatro|museu|parque|praia|passeio|voo|passagem aerea|latam|gol|azul|decolar|hurb|cvc|trip|turismo|jogos|steam|playstation|xbox|nintendo)\b/i,
+    regex: /\b(viagem|airbnb|booking|hotel|pousada|resort|hostel|cinema|cinemark|cinepolis|ingresso|sympla|eventim|show|teatro|museu|parque|praia|passeio|voo|passagem aerea|passagem europa|passagem|latam|gol|azul|decolar|hurb|cvc|trip|turismo|jogos|steam|playstation|xbox|nintendo|legoland|elase)\b/i,
   },
   {
     categoryId: 'assinaturas',
@@ -180,12 +198,22 @@ const TOKEN_RULES: { categoryId: string; regex: RegExp; weight: number }[] = [
   {
     categoryId: 'saude',
     weight: 0.95,
-    regex: /\b(farmacia|drogaria|drogasil|droga raia|raia|pague menos|panvel|sao paulo drogaria|araujo|remedio|medicamento|medico|dentista|odontologia|oftalmo|consulta|exame|laboratorio|fleury|lavoisier|dasa|hospital|clinica|psicologo|terapia|fisioterapia)\b/i,
+    regex: /\b(farmacia|drogaria|drogasil|droga raia|raia|pague menos|panvel|sao paulo drogaria|araujo|remedio|medicamento|medico|dentista|odontologia|oftalmo|consulta|exame|laboratorio|fleury|lavoisier|dasa|hospital|clinica|psicologo|terapia|fisioterapia|probiotico|protetor solar)\b/i,
   },
   {
     categoryId: 'casa',
     weight: 0.90,
-    regex: /\b(faxina|diarista|limpeza|produtos de limpeza|reforma|material de construcao|leroy merlin|leroy|c&c|telhanorte|eletricista|encanador|chaveiro|pintor|marceneiro|conserto|reparo|lampada|utensilios|tok&stok|camicado|etna|mobly|cassol)\b/i,
+    regex: /\b(faxina|diarista|limpeza|produtos de limpeza|reforma|material de construcao|leroy merlin|leroy|c&c|telhanorte|eletricista|encanador|chaveiro|pintor|marceneiro|conserto|reparo|lampada|utensilios|tok&stok|camicado|etna|mobly|cassol|ahoy)\b/i,
+  },
+  {
+    categoryId: 'pets',
+    weight: 0.95,
+    regex: /\b(petlove|cobasi|petz|racao|veterinario|veterinaria|pet shop|petshop|mixi|areia de gato|banho e tosa|antipulgas|vermifugo|cachorro|gato|felino|canino|coleira|petisco|racao mixi)\b/i,
+  },
+  {
+    categoryId: 'compras',
+    weight: 0.90,
+    regex: /\b(shopee|temu|aliexpress|shein|mercado livre|mercadolivre|presente|lembrancinha|brinquedo|bebe|cha de bebe|aniversario|papelaria|livro|livraria|zara|renner|c&a|riachuelo|calcado|vestuario|roupa|estofados|capa|decoracao|sala temu)\b/i,
   },
 ];
 

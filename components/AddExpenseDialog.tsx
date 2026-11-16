@@ -542,27 +542,31 @@ export default function AddExpenseDialog({
                   <span>{getCategoryInfo(category).name}</span>
                 </button>
                 {showCategoryPicker && (
-                  <div className="absolute left-0 top-7 mt-1 bg-white border border-gray-200 shadow-xl rounded-xl p-1.5 z-30 w-56 grid grid-cols-1 gap-1 max-h-48 overflow-y-auto">
-                    {CATEGORY_LIST.map((cat) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          setCategory(cat.id);
-                          setIsCategoryManual(true);
-                          setShowCategoryPicker(false);
-                        }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors ${category === cat.id ? 'bg-teal-50 text-teal-700 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setShowCategoryPicker(false)} />
+                    <div className="absolute left-0 top-7 mt-1 bg-white border border-gray-200 shadow-2xl rounded-xl p-1.5 z-30 w-56 grid grid-cols-1 gap-1 max-h-56 overflow-y-auto">
+                      {CATEGORY_LIST.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setCategory(cat.id);
+                            setIsCategoryManual(true);
+                            setShowCategoryPicker(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors ${
+                            category === cat.id ? 'bg-teal-50 text-teal-700 font-bold' : 'hover:bg-gray-50 text-gray-700'
                           }`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
-                          {cat.name}
-                        </span>
-                        {category === cat.id && <span className="text-teal-600 text-[10px]">✓</span>}
-                      </button>
-                    ))}
-                  </div>
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
+                            {cat.name}
+                          </span>
+                          {category === cat.id && <span className="text-teal-600 text-[10px]">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
